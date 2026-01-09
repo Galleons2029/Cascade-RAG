@@ -1,2 +1,6 @@
 .idea/
 .rabbitmq/
+
+.vscode/
+
+.DS_Store
