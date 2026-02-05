@@ -1,4 +1,4 @@
-# Bank-copilot: An Open-Source AI Agent Platform for Financial Management using LLMs
+# Cascade-RAG: An Open-Source AI Agent Platform for Knowledge Base
 
 A production-ready Agent platform for bank financial management with LangGraph integration. Providing a robust foundation for building scalable, secure, and maintainable AI agent services.
 
