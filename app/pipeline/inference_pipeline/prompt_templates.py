@@ -1,6 +1,5 @@
-
 from app.core.rag.prompt_templates import BasePromptTemplate
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 
 
 class InferenceTemplate(BasePromptTemplate):
@@ -20,7 +19,7 @@ class InferenceTemplate(BasePromptTemplate):
             步骤2：你需要分析提供的上下文，以及其中的信息如何与用户指令相关。
             步骤3：生成内容时要注意，基于查询尽可能保持连贯和简洁。你将使用从用户指令和上下文中推断出的用户写作风格和语气。
             首先尝试基于上下文回答。如果上下文不相关，则用“我无法回答你的问题，因为我没有足够的上下文。”拒绝回答，并给出可能的解决方案。"
-            """ # noqa: E501
+            """  # noqa: E501
 
     rag_prompt_template: str = """
         ### Instruction:
@@ -37,6 +36,4 @@ class InferenceTemplate(BasePromptTemplate):
                 input_variables=["question", "context"],
             )
 
-        return self.simple_system_prompt, PromptTemplate(
-            template=self.simple_prompt_template, input_variables=["question"]
-        )
+        return self.simple_system_prompt, PromptTemplate(template=self.simple_prompt_template, input_variables=["question"])

@@ -7,47 +7,45 @@
 这里是文件说明
 """
 
-from redis import Redis as Dragonfly, ConnectionPool
 from typing import List, Union
 
 from fastapi import HTTPException
-from sqlmodel import Session
-from app.models.schemas.chatsession import ChatSession, ChatHistory
-from app.models.chat_message import (
-    ChatSessionCreate, ChatHistoryCreate,
-    ChatSessionResponse, ChatHistoryResponse
-)
+from redis import ConnectionPool, Redis as Dragonfly
+from sqlmodel import select
+from sqlmodel.ext.asyncio.session import AsyncSession
 
-conn_pool = ConnectionPool(host='localhost', port=6379, db=0)
+from app.models.chat_message import ChatHistoryCreate, ChatHistoryResponse, ChatSessionCreate, ChatSessionResponse
+from app.models.schemas.chatsession import ChatHistory, ChatSession
+
+conn_pool = ConnectionPool(host="localhost", port=6379, db=0)
 dragonfly_client = Dragonfly(connection_pool=conn_pool)
+
 
 def get_dragonfly():
     return dragonfly_client
 
 
 class DataService:
-    def __init__(self, db: Session, df: Dragonfly):
+    def __init__(self, db: AsyncSession, df: Dragonfly):
         self.db = db
         self.df = df
 
     # Create a new chat session with the first two chat history entries.
     # The first chat history entry is a prompt (human message), and the second is a response (AI message).
-    def create_chat_session(
-            self,
-            new_chat_session: ChatSessionCreate,
-            new_chat_histories: (ChatHistoryCreate, ChatHistoryCreate)
+    async def create_chat_session(
+        self, new_chat_session: ChatSessionCreate, new_chat_histories: (ChatHistoryCreate, ChatHistoryCreate)
     ) -> ChatSessionResponse:
         # Create a new chat session.
         chat_session = ChatSession(llm_name=new_chat_session.llm_name)
         self.db.add(chat_session)
-        self.db.flush()
+        await self.db.flush()
 
         # Add the first two chat history entries for the chat session.
         chat_history_human = self.__chat_history_schema_to_model(chat_session.id, new_chat_histories[0])
         chat_history_ai = self.__chat_history_schema_to_model(chat_session.id, new_chat_histories[1])
         self.db.add_all([chat_history_human, chat_history_ai])
-        self.db.commit()
-        self.db.refresh(chat_session)
+        await self.db.commit()
+        await self.db.refresh(chat_session)
 
         # Since this is a new chat session, and the user will likely want to continue this chat session.
         # We will cache the chat history entries in Dragonfly.
@@ -60,17 +58,18 @@ class DataService:
     # Add two chat history entries to an existing chat session.
     # The first chat history entry is a prompt (human message), and the second is a response (AI message).
     # Handler much call 'self.read_chat_histories' before calling this method.
-    def add_chat_histories(
-            self,
-            prev_chat_session_response: ChatSessionResponse,
-            new_chat_histories: (ChatHistoryCreate, ChatHistoryCreate),
+    async def add_chat_histories(
+        self,
+        prev_chat_session_response: ChatSessionResponse,
+        new_chat_histories: (ChatHistoryCreate, ChatHistoryCreate),
     ) -> ChatSessionResponse:
         # Add the new chat history entries.
         chat_session_id = prev_chat_session_response.chat_session_id
         chat_history_human = self.__chat_history_schema_to_model(chat_session_id, new_chat_histories[0])
         chat_history_ai = self.__chat_history_schema_to_model(chat_session_id, new_chat_histories[1])
         self.db.add_all([chat_history_human, chat_history_ai])
-        self.db.commit()
+        await self.db.flush()
+        await self.db.commit()
 
         # Cache the chat history entries in Dragonfly.
         ru = _DataCacheService(self.df)
@@ -81,7 +80,7 @@ class DataService:
         return prev_chat_session_response
 
     # Read all chat history entries for a chat session.
-    def read_chat_histories(self, chat_session_id: int) -> Union[ChatSessionResponse, None]:
+    async def read_chat_histories(self, chat_session_id: int) -> Union[ChatSessionResponse, None]:
         # Check if the chat history entries are cached in Dragonfly.
         ru = _DataCacheService(self.df)
         chat_history_responses = ru.read_chat_histories(chat_session_id)
@@ -89,10 +88,9 @@ class DataService:
             return ChatSessionResponse(chat_session_id, chat_history_responses)
         # If the chat history entries are not cached in Dragonfly, read from the database.
         # Then cache them in Dragonfly.
-        chat_histories = self.db.query(ChatHistory) \
-            .filter(ChatHistory.chat_session_id == chat_session_id) \
-            .order_by(ChatHistory.id) \
-            .all()
+        statement = select(ChatHistory).where(ChatHistory.chat_session_id == chat_session_id).order_by(ChatHistory.id)
+        results = await self.db.exec(statement)
+        chat_histories = results.all()
         if chat_histories is None or len(chat_histories) == 0:
             return None
         chat_history_responses = [ChatHistoryResponse(v.id, v.content, v.is_human_message) for v in chat_histories]
@@ -101,8 +99,8 @@ class DataService:
 
     @staticmethod
     def __chat_history_schema_to_model(
-            chat_session_id: int,
-            chat_history: ChatHistoryCreate,
+        chat_session_id: int,
+        chat_history: ChatHistoryCreate,
     ):
         return ChatHistory(
             chat_session_id=chat_session_id,
@@ -130,7 +128,7 @@ class _DataCacheService:
     @staticmethod
     def chat_history_tuple_to_response(chat_history: (str, float)) -> ChatHistoryResponse:
         # Note that the sorted-set value is the content, and the score is the ID.
-        prefixed_content = chat_history[0].decode('utf-8', errors='replace')
+        prefixed_content = chat_history[0].decode("utf-8", errors="replace")
         if len(prefixed_content) < 2:
             raise HTTPException(status_code=500, detail="failed to parse chat history")
         prefix, content = prefixed_content[:2], prefixed_content[2:]

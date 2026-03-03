@@ -20,9 +20,9 @@ from jose import (
     jwt,
 )
 
-from app.core.config import settings
-from app.core.logging import logger
-from app.schemas.auth import Token
+from app.configs import agent_config as settings
+from app.core.logger_utils import logger
+from app.models.auth import Token
 from app.utils.sanitization import sanitize_string
 
 
@@ -90,4 +90,3 @@ def verify_token(token: str) -> Optional[str]:
     except JWTError as e:
         logger.error("token_verification_failed", error=str(e))
         return None
-

@@ -130,9 +130,7 @@ class AgentConfig:
         # Application Settings
         self.PROJECT_NAME = os.getenv("PROJECT_NAME", "FastAPI LangGraph Template")
         self.VERSION = os.getenv("VERSION", "1.0.0")
-        self.DESCRIPTION = os.getenv(
-            "DESCRIPTION", "A production-ready FastAPI template with LangGraph and Langfuse integration"
-        )
+        self.DESCRIPTION = os.getenv("DESCRIPTION", "A production-ready FastAPI template with LangGraph and Langfuse integration")
         self.API_V1_STR = os.getenv("API_V1_STR", "/api/v1")
         self.DEBUG = os.getenv("DEBUG", "false").lower() in ("true", "1", "t", "yes")
 
@@ -146,7 +144,7 @@ class AgentConfig:
 
         # LangGraph Configuration
         self.LLM_API_KEY = os.getenv("LLM_API_KEY", "")
-        self.LLM_MODEL = os.getenv("LLM_MODEL", "gpt-4o-mini")
+        self.LLM_MODEL = os.getenv("LLM_MODEL", "deepseek-ai/DeepSeek-V3.2")
         self.DEFAULT_LLM_TEMPERATURE = float(os.getenv("DEFAULT_LLM_TEMPERATURE", "0.2"))
         self.MAX_TOKENS = int(os.getenv("MAX_TOKENS", "2000"))
         self.MAX_LLM_CALL_RETRIES = int(os.getenv("MAX_LLM_CALL_RETRIES", "3"))
@@ -160,12 +158,20 @@ class AgentConfig:
         self.LOG_DIR = Path(os.getenv("LOG_DIR", "logs"))
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
         self.LOG_FORMAT = os.getenv("LOG_FORMAT", "json")  # "json" or "console"
+        self.ENABLE_PIKA_DEBUG = os.getenv("ENABLE_PIKA_DEBUG", "false").lower() in ("true", "1", "t", "yes")
 
         # Postgres Configuration
         self.POSTGRES_URL = os.getenv("POSTGRES_URL", "")
         self.POSTGRES_POOL_SIZE = int(os.getenv("POSTGRES_POOL_SIZE", "20"))
         self.POSTGRES_MAX_OVERFLOW = int(os.getenv("POSTGRES_MAX_OVERFLOW", "10"))
         self.CHECKPOINT_TABLES = ["checkpoint_blobs", "checkpoint_writes", "checkpoints"]
+
+        # RabbitMQ Configuration
+        self.RABBITMQ_DEFAULT_USERNAME = os.getenv("RABBITMQ_DEFAULT_USERNAME", "guest")
+        self.RABBITMQ_DEFAULT_PASSWORD = os.getenv("RABBITMQ_DEFAULT_PASSWORD", "guest")
+        self.RABBITMQ_HOST = os.getenv("RABBITMQ_HOST", "localhost")
+        self.RABBITMQ_PORT = int(os.getenv("RABBITMQ_PORT", "5672"))
+        self.RABBITMQ_QUEUE_NAME = os.getenv("RABBITMQ_QUEUE_NAME", "rag_test")
 
         # Rate Limiting Configuration
         self.RATE_LIMIT_DEFAULT = parse_list_from_env("RATE_LIMIT_DEFAULT", ["200 per day", "50 per hour"])
@@ -234,4 +240,3 @@ class AgentConfig:
             # Only override if environment variable wasn't explicitly set
             if env_var_name not in os.environ:
                 setattr(self, key, value)
-

@@ -10,10 +10,7 @@
 from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict
 
 
-
-class RAGConfig(
-    BaseSettings
-):
+class RAGConfig(BaseSettings):
     model_config = SettingsConfigDict(
         # read from dotenv format config file
         env_file=".env",

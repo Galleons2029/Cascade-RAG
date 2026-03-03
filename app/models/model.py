@@ -6,6 +6,7 @@
 """
 这里是文件说明
 """
+
 import json
 import re
 import uuid
@@ -158,9 +159,10 @@ class App(Base):
         if not app_model_config.agent_mode:
             return False
 
-        if app_model_config.agent_mode_dict.get("enabled", False) and app_model_config.agent_mode_dict.get(
-            "strategy", ""
-        ) in {"function_call", "react"}:
+        if app_model_config.agent_mode_dict.get("enabled", False) and app_model_config.agent_mode_dict.get("strategy", "") in {
+            "function_call",
+            "react",
+        }:
             self.mode = AppMode.AGENT_CHAT.value
             db.session.commit()
             return True
@@ -235,24 +237,18 @@ class App(Base):
 
         if builtin_provider_ids:
             # get the non-hardcoded builtin providers
-            non_hardcoded_builtin_providers = [
-                provider_id for provider_id in builtin_provider_ids if not provider_id.is_hardcoded
-            ]
+            non_hardcoded_builtin_providers = [provider_id for provider_id in builtin_provider_ids if not provider_id.is_hardcoded]
             if non_hardcoded_builtin_providers:
                 existence = list(PluginService.check_tools_existence(self.tenant_id, non_hardcoded_builtin_providers))
             else:
                 existence = []
             # add the hardcoded builtin providers
             existence.extend([True] * (len(builtin_provider_ids) - len(non_hardcoded_builtin_providers)))
-            builtin_provider_ids = non_hardcoded_builtin_providers + [
-                provider_id for provider_id in builtin_provider_ids if provider_id.is_hardcoded
-            ]
+            builtin_provider_ids = non_hardcoded_builtin_providers + [provider_id for provider_id in builtin_provider_ids if provider_id.is_hardcoded]
         else:
             existence = []
 
-        existing_builtin_providers = {
-            provider_id.provider_name: existence[i] for i, provider_id in enumerate(builtin_provider_ids)
-        }
+        existing_builtin_providers = {provider_id.provider_name: existence[i] for i, provider_id in enumerate(builtin_provider_ids)}
 
         deleted_tools = []
 
@@ -360,11 +356,7 @@ class AppModelConfig(Base):
 
     @property
     def suggested_questions_after_answer_dict(self) -> dict:
-        return (
-            json.loads(self.suggested_questions_after_answer)
-            if self.suggested_questions_after_answer
-            else {"enabled": False}
-        )
+        return json.loads(self.suggested_questions_after_answer) if self.suggested_questions_after_answer else {"enabled": False}
 
     @property
     def speech_to_text_dict(self) -> dict:
@@ -380,9 +372,7 @@ class AppModelConfig(Base):
 
     @property
     def annotation_reply_dict(self) -> dict:
-        annotation_setting = (
-            db.session.query(AppAnnotationSetting).filter(AppAnnotationSetting.app_id == self.app_id).first()
-        )
+        annotation_setting = db.session.query(AppAnnotationSetting).filter(AppAnnotationSetting.app_id == self.app_id).first()
         if annotation_setting:
             collection_binding_detail = annotation_setting.collection_binding_detail
             if not collection_binding_detail:
@@ -407,11 +397,7 @@ class AppModelConfig(Base):
 
     @property
     def sensitive_word_avoidance_dict(self) -> dict:
-        return (
-            json.loads(self.sensitive_word_avoidance)
-            if self.sensitive_word_avoidance
-            else {"enabled": False, "type": "", "configs": []}
-        )
+        return json.loads(self.sensitive_word_avoidance) if self.sensitive_word_avoidance else {"enabled": False, "type": "", "configs": []}
 
     @property
     def external_data_tools_list(self) -> list[dict]:
@@ -423,11 +409,7 @@ class AppModelConfig(Base):
 
     @property
     def agent_mode_dict(self) -> dict:
-        return (
-            json.loads(self.agent_mode)
-            if self.agent_mode
-            else {"enabled": False, "strategy": None, "tools": [], "prompt": None}
-        )
+        return json.loads(self.agent_mode) if self.agent_mode else {"enabled": False, "strategy": None, "tools": [], "prompt": None}
 
     @property
     def chat_prompt_config_dict(self) -> dict:
@@ -490,47 +472,27 @@ class AppModelConfig(Base):
 
     def from_model_config_dict(self, model_config: Mapping[str, Any]):
         self.opening_statement = model_config.get("opening_statement")
-        self.suggested_questions = (
-            json.dumps(model_config["suggested_questions"]) if model_config.get("suggested_questions") else None
-        )
+        self.suggested_questions = json.dumps(model_config["suggested_questions"]) if model_config.get("suggested_questions") else None
         self.suggested_questions_after_answer = (
-            json.dumps(model_config["suggested_questions_after_answer"])
-            if model_config.get("suggested_questions_after_answer")
-            else None
+            json.dumps(model_config["suggested_questions_after_answer"]) if model_config.get("suggested_questions_after_answer") else None
         )
         self.speech_to_text = json.dumps(model_config["speech_to_text"]) if model_config.get("speech_to_text") else None
         self.text_to_speech = json.dumps(model_config["text_to_speech"]) if model_config.get("text_to_speech") else None
         self.more_like_this = json.dumps(model_config["more_like_this"]) if model_config.get("more_like_this") else None
-        self.sensitive_word_avoidance = (
-            json.dumps(model_config["sensitive_word_avoidance"])
-            if model_config.get("sensitive_word_avoidance")
-            else None
-        )
-        self.external_data_tools = (
-            json.dumps(model_config["external_data_tools"]) if model_config.get("external_data_tools") else None
-        )
+        self.sensitive_word_avoidance = json.dumps(model_config["sensitive_word_avoidance"]) if model_config.get("sensitive_word_avoidance") else None
+        self.external_data_tools = json.dumps(model_config["external_data_tools"]) if model_config.get("external_data_tools") else None
         self.model = json.dumps(model_config["model"]) if model_config.get("model") else None
-        self.user_input_form = (
-            json.dumps(model_config["user_input_form"]) if model_config.get("user_input_form") else None
-        )
+        self.user_input_form = json.dumps(model_config["user_input_form"]) if model_config.get("user_input_form") else None
         self.dataset_query_variable = model_config.get("dataset_query_variable")
         self.pre_prompt = model_config["pre_prompt"]
         self.agent_mode = json.dumps(model_config["agent_mode"]) if model_config.get("agent_mode") else None
-        self.retriever_resource = (
-            json.dumps(model_config["retriever_resource"]) if model_config.get("retriever_resource") else None
-        )
+        self.retriever_resource = json.dumps(model_config["retriever_resource"]) if model_config.get("retriever_resource") else None
         self.prompt_type = model_config.get("prompt_type", "simple")
-        self.chat_prompt_config = (
-            json.dumps(model_config.get("chat_prompt_config")) if model_config.get("chat_prompt_config") else None
-        )
+        self.chat_prompt_config = json.dumps(model_config.get("chat_prompt_config")) if model_config.get("chat_prompt_config") else None
         self.completion_prompt_config = (
-            json.dumps(model_config.get("completion_prompt_config"))
-            if model_config.get("completion_prompt_config")
-            else None
+            json.dumps(model_config.get("completion_prompt_config")) if model_config.get("completion_prompt_config") else None
         )
-        self.dataset_configs = (
-            json.dumps(model_config.get("dataset_configs")) if model_config.get("dataset_configs") else None
-        )
+        self.dataset_configs = json.dumps(model_config.get("dataset_configs")) if model_config.get("dataset_configs") else None
         self.file_upload = json.dumps(model_config.get("file_upload")) if model_config.get("file_upload") else None
         return self
 
@@ -666,9 +628,7 @@ class Conversation(Base):
     updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
 
     messages = db.relationship("Message", backref="conversation", lazy="select", passive_deletes="all")
-    message_annotations = db.relationship(
-        "MessageAnnotation", backref="conversation", lazy="select", passive_deletes="all"
-    )
+    message_annotations = db.relationship("MessageAnnotation", backref="conversation", lazy="select", passive_deletes="all")
 
     is_deleted = db.Column(db.Boolean, nullable=False, server_default=db.text("false"))
 
@@ -687,9 +647,7 @@ class Conversation(Base):
                 elif value["transfer_method"] in [FileTransferMethod.LOCAL_FILE, FileTransferMethod.REMOTE_URL]:
                     value["upload_file_id"] = value["related_id"]
                 inputs[key] = file_factory.build_from_mapping(mapping=value, tenant_id=value["tenant_id"])
-            elif isinstance(value, list) and all(
-                isinstance(item, dict) and item.get("dify_model_identity") == FILE_MODEL_IDENTITY for item in value
-            ):
+            elif isinstance(value, list) and all(isinstance(item, dict) and item.get("dify_model_identity") == FILE_MODEL_IDENTITY for item in value):
                 inputs[key] = []
                 for item in value:
                     if item["transfer_method"] == FileTransferMethod.TOOL_FILE:
@@ -730,9 +688,7 @@ class Conversation(Base):
                 else:
                     model_config["configs"] = override_model_configs
             else:
-                app_model_config = (
-                    db.session.query(AppModelConfig).filter(AppModelConfig.id == self.app_model_config_id).first()
-                )
+                app_model_config = db.session.query(AppModelConfig).filter(AppModelConfig.id == self.app_model_config_id).first()
                 if app_model_config:
                     model_config = app_model_config.to_dict()
 
@@ -839,12 +795,7 @@ class Conversation(Base):
 
     @property
     def first_message(self):
-        return (
-            db.session.query(Message)
-            .filter(Message.conversation_id == self.id)
-            .order_by(Message.created_at.asc())
-            .first()
-        )
+        return db.session.query(Message).filter(Message.conversation_id == self.id).order_by(Message.created_at.asc()).first()
 
     @property
     def app(self):
@@ -957,9 +908,7 @@ class Message(Base):
                 elif value["transfer_method"] in [FileTransferMethod.LOCAL_FILE, FileTransferMethod.REMOTE_URL]:
                     value["upload_file_id"] = value["related_id"]
                 inputs[key] = file_factory.build_from_mapping(mapping=value, tenant_id=value["tenant_id"])
-            elif isinstance(value, list) and all(
-                isinstance(item, dict) and item.get("dify_model_identity") == FILE_MODEL_IDENTITY for item in value
-            ):
+            elif isinstance(value, list) and all(isinstance(item, dict) and item.get("dify_model_identity") == FILE_MODEL_IDENTITY for item in value):
                 inputs[key] = []
                 for item in value:
                     if item["transfer_method"] == FileTransferMethod.TOOL_FILE:
@@ -1055,20 +1004,12 @@ class Message(Base):
 
     @property
     def user_feedback(self):
-        feedback = (
-            db.session.query(MessageFeedback)
-            .filter(MessageFeedback.message_id == self.id, MessageFeedback.from_source == "user")
-            .first()
-        )
+        feedback = db.session.query(MessageFeedback).filter(MessageFeedback.message_id == self.id, MessageFeedback.from_source == "user").first()
         return feedback
 
     @property
     def admin_feedback(self):
-        feedback = (
-            db.session.query(MessageFeedback)
-            .filter(MessageFeedback.message_id == self.id, MessageFeedback.from_source == "admin")
-            .first()
-        )
+        feedback = db.session.query(MessageFeedback).filter(MessageFeedback.message_id == self.id, MessageFeedback.from_source == "admin").first()
         return feedback
 
     @property
@@ -1083,15 +1024,9 @@ class Message(Base):
 
     @property
     def annotation_hit_history(self):
-        annotation_history = (
-            db.session.query(AppAnnotationHitHistory).filter(AppAnnotationHitHistory.message_id == self.id).first()
-        )
+        annotation_history = db.session.query(AppAnnotationHitHistory).filter(AppAnnotationHitHistory.message_id == self.id).first()
         if annotation_history:
-            annotation = (
-                db.session.query(MessageAnnotation)
-                .filter(MessageAnnotation.id == annotation_history.annotation_id)
-                .first()
-            )
+            annotation = db.session.query(MessageAnnotation).filter(MessageAnnotation.id == annotation_history.annotation_id).first()
             return annotation
         return None
 
@@ -1099,9 +1034,7 @@ class Message(Base):
     def app_model_config(self):
         conversation = db.session.query(Conversation).filter(Conversation.id == self.conversation_id).first()
         if conversation:
-            return (
-                db.session.query(AppModelConfig).filter(AppModelConfig.id == conversation.app_model_config_id).first()
-            )
+            return db.session.query(AppModelConfig).filter(AppModelConfig.id == conversation.app_model_config_id).first()
 
         return None
 
@@ -1116,10 +1049,7 @@ class Message(Base):
     @property
     def agent_thoughts(self):
         return (
-            db.session.query(MessageAgentThought)
-            .filter(MessageAgentThought.message_id == self.id)
-            .order_by(MessageAgentThought.position.asc())
-            .all()
+            db.session.query(MessageAgentThought).filter(MessageAgentThought.message_id == self.id).order_by(MessageAgentThought.position.asc()).all()
         )
 
     @property
@@ -1177,9 +1107,7 @@ class Message(Base):
                     tenant_id=current_app.tenant_id,
                 )
             else:
-                raise ValueError(
-                    f"MessageFile {message_file.id} has an invalid transfer_method {message_file.transfer_method}"
-                )
+                raise ValueError(f"MessageFile {message_file.id} has an invalid transfer_method {message_file.transfer_method}")
             files.append(file)
 
         result = [
@@ -1420,9 +1348,7 @@ class AppAnnotationSetting(Base):
         from .dataset import DatasetCollectionBinding
 
         collection_binding_detail = (
-            db.session.query(DatasetCollectionBinding)
-            .filter(DatasetCollectionBinding.id == self.collection_binding_id)
-            .first()
+            db.session.query(DatasetCollectionBinding).filter(DatasetCollectionBinding.id == self.collection_binding_id).first()
         )
         return collection_binding_detail
 
@@ -1562,9 +1488,7 @@ class UploadFile(Base):
     size: Mapped[int] = db.Column(db.Integer, nullable=False)
     extension: Mapped[str] = db.Column(db.String(255), nullable=False)
     mime_type: Mapped[str] = db.Column(db.String(255), nullable=True)
-    created_by_role: Mapped[str] = db.Column(
-        db.String(255), nullable=False, server_default=db.text("'account'::character varying")
-    )
+    created_by_role: Mapped[str] = db.Column(db.String(255), nullable=False, server_default=db.text("'account'::character varying"))
     created_by: Mapped[str] = db.Column(StringUUID, nullable=False)
     created_at: Mapped[datetime] = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
     used: Mapped[bool] = db.Column(db.Boolean, nullable=False, server_default=db.text("false"))
@@ -1828,9 +1752,7 @@ class TraceAppConfig(Base):
     tracing_provider = db.Column(db.String(255), nullable=True)
     tracing_config = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp())
-    updated_at = db.Column(
-        db.DateTime, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp()
-    )
+    updated_at = db.Column(db.DateTime, nullable=False, server_default=func.current_timestamp(), onupdate=func.current_timestamp())
     is_active = db.Column(db.Boolean, nullable=False, server_default=db.text("true"))
 
     @property

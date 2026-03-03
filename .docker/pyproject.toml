@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "cascade-RAG"
+name = "Bank-copilot"
 description = ""
 version = "0.1.0"
 authors = [
@@ -32,7 +32,6 @@ pymongo = "^4.7.1"
 structlog = "^24.1.0"
 rich = "^13.7.1"
 #comet-ml = "^3.41.0"
-opik = "1.0.1"
 ruff = "^0.4.3"
 pandas = "^2.0.3"
 datasets = "^2.19.1"
@@ -49,7 +48,7 @@ huggingface-hub = "0.25.1"
 gradio = "^5.5.0"
 
 [tool.poetry.group.feature_pipeline.dependencies]
-bytewax = "0.18.2"
+bytewax = ">=0.21.1"
 
 
 [build-system]

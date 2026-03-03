@@ -32,14 +32,16 @@ class RepositoryChunkModel(DataModel):
     owner_id: str
     type: str
 
+
 class DocumentChunkModel(DataModel):
     entry_id: str
     knowledge_id: str
-    doc_id: str 
+    doc_id: str
     filename: str
     path: str
     chunk_id: str
     chunk_content: str
     user_id: str | None = None
     image: Optional[str] = None
+    images: Optional[list[dict]] = None
     type: str

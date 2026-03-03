@@ -1,0 +1,36 @@
+# Minimal dependencies required for the langgraph agent container
+# Includes graph dependencies from app/core/agent/graph/* and deep_research.
+
+# Core LLM / LangChain / LangGraph stack
+langchain>=1.0.8
+langchain-anthropic>=1.0.3
+langchain-community>=0.4.1
+langchain-core>=1.1.0
+langchain-google-genai>=3.1.0
+langchain-openai>=1.0.2
+langchain-tavily>=0.2.13
+langgraph>=1.0.8
+langgraph-api>=0.5.24
+langgraph-prebuilt>=1.0.7
+langgraph-runtime-inmem>=0.24.1
+langgraph-sdk>=0.2.9
+langgraph-cli[inmem]>=0.4.12
+
+# Deep research agent runtime dependencies
+deepagents>=0.2.6
+tavily-python>=0.5.0
+markdownify>=1.2.0
+
+# HTTP client used by most LLM integrations
+httpx[socks]>=0.28.1
+
+# Pydantic and settings (for configs/models)
+pydantic>=2.11.5
+pydantic-settings>=2.9.1
+
+# Environment and logging helpers
+python-dotenv>=1.0.0
+structlog>=25.3.0
+
+# If you see ModuleNotFoundError at runtime for other libs from app/,
+# add the corresponding packages here and rebuild.

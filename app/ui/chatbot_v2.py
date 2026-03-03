@@ -15,7 +15,8 @@ import os
 import uuid
 
 from app.core.mq import publish_to_rabbitmq
-from app.core.config import settings
+from app.configs import agent_config as app_settings
+from app.configs import llm_config, qdrant_config
 from app.core import logger_utils
 from app.pipeline.feature_pipeline.models.raw import DocumentRawModel
 from app.pipeline.inference_pipeline.reasoning import ReasoningPipeline
@@ -24,7 +25,7 @@ from app.pipeline.inference_pipeline.prompt_templates import InferenceTemplate
 from app.core.rag.retriever import VectorRetriever
 from app.core.rag.prompt_templates import QueryExpansionTemplate
 from langchain_openai import ChatOpenAI
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from app.pipeline.inference_pipeline.utils import compute_num_tokens, truncate_text_to_max_tokens
 from pathlib import Path
 from markitdown import MarkItDown
@@ -35,20 +36,23 @@ UPLOAD_FOLDER = os.path.join(ROOT_DIR, "uploads")
 
 
 sleep_time = 0.5
-model = ChatOpenAI(model=settings.MODEL_PATH,
-                   api_key=settings.KEY,
-                   base_url=settings.LOCAL,
-                   extra_body={"chat_template_kwargs": {"enable_thinking": False}},)
+model = ChatOpenAI(
+    model=llm_config.LLM_MODEL or llm_config.FREE_LLM_MODEL,
+    api_key=llm_config.API_KEY or llm_config.SILICON_KEY,
+    base_url=llm_config.SILICON_BASE_URL,
+    extra_body={"chat_template_kwargs": {"enable_thinking": False}},
+)
 query_expansion_template = QueryExpansionTemplate()
 prompt = query_expansion_template.create_template(3)
 chain = prompt | model
-client = QdrantClient(url="http://localhost:6333")
+# 使用配置中的 Qdrant 连接信息，兼容 Docker 和本地部署
+client = QdrantClient(host=qdrant_config.QDRANT_DATABASE_HOST, port=qdrant_config.QDRANT_DATABASE_PORT)
 doc_bases = [collection.name for collection in client.get_collections().collections]
 
 logger = logger_utils.get_logger(__name__)
 
 
-def process_uploaded_file(files: list, dir_files: list, collection_choice: str = 'default'):
+def process_uploaded_file(files: list, dir_files: list, collection_choice: str = "default"):
     """
     处理上传的文件，支持单个文件上传和目录上传两种方式。
 
@@ -89,7 +93,7 @@ def process_uploaded_file(files: list, dir_files: list, collection_choice: str =
                     type="documents",
                     entry_id=str(uuid.uuid4()),
                 ).model_dump_json()
-                publish_to_rabbitmq(queue_name='test_files', data=data)
+                publish_to_rabbitmq(queue_name="test_files", data=data)
                 logger.info(f"成功处理并发送文件：{file}")
                 processed_count += 1
             except Exception as e:
@@ -106,18 +110,14 @@ def process_uploaded_file(files: list, dir_files: list, collection_choice: str =
         return f"处理文件时发生错误: {str(e)}", "", ""
 
 
-def process_query(query: str, show_reasoning: bool = False, use_background: bool = True,
-                  selected_collections: list = None):
+def process_query(query: str, show_reasoning: bool = False, use_background: bool = True, selected_collections: list = None):
     inference_endpoint = ReasoningPipeline(mock=False)
 
     response = inference_endpoint.generate(
-        query=query,
-        enable_rag=True,
-        sample_for_evaluation=True,
-        doc_names=selected_collections if selected_collections else None
+        query=query, enable_rag=True, sample_for_evaluation=True, doc_names=selected_collections if selected_collections else None
     )
 
-    return response['answer']
+    return response["answer"]
 
 
 def add_new_collection(new_collection: str):
@@ -140,9 +140,14 @@ def add_new_collection(new_collection: str):
 
     client.create_collection(
         collection_name=new_collection,
-        vectors_config=models.VectorParams(size=settings.EMBEDDING_SIZE, distance=models.Distance.COSINE),
+        vectors_config=models.VectorParams(size=llm_config.EMBEDDING_SIZE, distance=models.Distance.COSINE),
         quantization_config=models.ScalarQuantization(
-            scalar=models.ScalarQuantizationConfig(type=models.ScalarType.INT8, quantile=0.99, always_ram=True, ), ),
+            scalar=models.ScalarQuantizationConfig(
+                type=models.ScalarType.INT8,
+                quantile=0.99,
+                always_ram=True,
+            ),
+        ),
     )
 
     logger.debug(f"{doc_bases}<UNK>{new_collection}<UNK>]")
@@ -151,18 +156,15 @@ def add_new_collection(new_collection: str):
     return doc_bases
 
 
-
 def format_prompt(
-        system_prompt,
-        prompt_template: PromptTemplate,
-        prompt_template_variables: dict,
+    system_prompt,
+    prompt_template: PromptTemplate,
+    prompt_template_variables: dict,
 ) -> tuple[list[dict[str, str]], int]:
     prompt = prompt_template.format(**prompt_template_variables)
 
     num_system_prompt_tokens = compute_num_tokens(system_prompt)
-    prompt, prompt_num_tokens = truncate_text_to_max_tokens(
-        prompt, max_tokens=settings.MAX_INPUT_TOKENS - num_system_prompt_tokens
-    )
+    prompt, prompt_num_tokens = truncate_text_to_max_tokens(prompt, max_tokens=app_settings.MAX_TOKENS - num_system_prompt_tokens)
     total_input_tokens = num_system_prompt_tokens + prompt_num_tokens
 
     messages = [
@@ -172,15 +174,13 @@ def format_prompt(
 
     return messages, total_input_tokens
 
+
 def kunlunrag_thinking_chat(prompt: str, history: list):
     history.append(ChatMessage(role="user", content=prompt))
     yield history
 
     start_time = time.time()
-    history.append(ChatMessage(
-        content="",
-        metadata={"title": "_生成多重查询_", "id": 0, "status": "pending"}
-    ))
+    history.append(ChatMessage(content="", metadata={"title": "_生成多重查询_", "id": 0, "status": "pending"}))
     yield history
     prompt_template_builder = InferenceTemplate()
     system_prompt, prompt_template = prompt_template_builder.create_template(enable_rag=True)
@@ -188,28 +188,19 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
 
     retriever = VectorRetriever(query=prompt)
 
-    full_output = ''
+    full_output = ""
     for chunk in chain.stream({"question": prompt}):
         # print(chunk, end="|", flush=True)
         full_output += chunk.content
         history[-1].content = full_output.strip()
         yield history
 
-
     queries = full_output.strip().split(query_expansion_template.separator)
-    stripped_queries = [
-        stripped_item for item in queries if (stripped_item := item.strip(" \\n"))
-    ]
+    stripped_queries = [stripped_item for item in queries if (stripped_item := item.strip(" \\n"))]
     logger.debug(stripped_queries)
-    hits = retriever.retrieve_top_k(
-        k=3, collections=['zsk_demo'], generated_queries=stripped_queries
-    )
+    hits = retriever.retrieve_top_k(k=3, collections=["zsk_demo"], generated_queries=stripped_queries)
 
-
-    history.append(ChatMessage(
-        content="",
-        metadata={"title": "查询到相关文档", "id": 1, "status": "pending"}
-    ))
+    history.append(ChatMessage(content="", metadata={"title": "查询到相关文档", "id": 1, "status": "pending"}))
     history[-1].metadata["duration"] = time.time() - start_time
     accumulated_thoughts = ""
     for hit in hits:
@@ -218,15 +209,10 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
         history[-1].content = accumulated_thoughts.strip()
         yield history
 
-    history.append(ChatMessage(
-        content="",
-        metadata={"title": "对文档进行重排", "id": 2, "status": "pending"}
-    ))
+    history.append(ChatMessage(content="", metadata={"title": "对文档进行重排", "id": 2, "status": "pending"}))
     context = retriever.rerank(hits=hits, keep_top_k=3)
     prompt_template_variables["context"] = context
-    messages, input_num_tokens = format_prompt(
-        system_prompt, prompt_template, prompt_template_variables
-    )
+    messages, input_num_tokens = format_prompt(system_prompt, prompt_template, prompt_template_variables)
     yield history
 
     history[-1].metadata["status"] = "done"
@@ -235,8 +221,7 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
 
     from openai import OpenAI
 
-    client = OpenAI(api_key="sk-jkcrphotzrjcdttdpbdzczufqryzmeogzbvwbtpabuitgnzx",
-                    base_url="https://api.siliconflow.cn/v1")
+    client = OpenAI(api_key="sk-jkcrphotzrjcdttdpbdzczufqryzmeogzbvwbtpabuitgnzx", base_url="https://api.siliconflow.cn/v1")
     answer = client.chat.completions.create(
         # model='Pro/deepseek-ai/DeepSeek-R1',
         model="deepseek-ai/DeepSeek-R1-0528-Qwen3-8B",
@@ -249,14 +234,7 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
     response_buffer = ""
     thinking_complete = False
 
-    history.append(
-        ChatMessage(
-            role="assistant",
-            content="",
-            metadata={"title": "⏳Thinking: *正在思考"}
-        )
-    )
-
+    history.append(ChatMessage(role="assistant", content="", metadata={"title": "⏳Thinking: *正在思考"}))
 
     for chunk in answer:
         content = chunk.choices[0].delta.content
@@ -265,22 +243,12 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
         if content and not thinking_complete:
             # Complete thought and start response
             content += content or ""
-            history[-1] = ChatMessage(
-                role="assistant",
-                content=thought_buffer,
-                metadata={"title": "⏳Thinking: *正在思考"}
-            )
+            history[-1] = ChatMessage(role="assistant", content=thought_buffer, metadata={"title": "⏳Thinking: *正在思考"})
 
             # Add response message
-            history.append(
-                ChatMessage(
-                    role="assistant",
-                    content=content
-                )
-            )
+            history.append(ChatMessage(role="assistant", content=content))
             response_buffer += content
             thinking_complete = True
-
 
         elif thinking_complete:
             # Continue streaming response
@@ -288,19 +256,16 @@ def kunlunrag_thinking_chat(prompt: str, history: list):
             history[-1] = ChatMessage(
                 role="assistant",
                 content=response_buffer,
-                #metadata = {"title": "最终回答！"}
+                # metadata = {"title": "最终回答！"}
             )
 
         else:
             # Continue streaming thoughts
             thought_buffer += reasoning_content or ""
-            history[-1] = ChatMessage(
-                role="assistant",
-                content=thought_buffer,
-                metadata={"title": "⏳Thinking: *推理思维链"}
-            )
+            history[-1] = ChatMessage(role="assistant", content=thought_buffer, metadata={"title": "⏳Thinking: *推理思维链"})
 
         yield history
+
 
 with gr.Blocks(title="推理问答知识库") as demo:
     gr.Markdown("""
@@ -311,32 +276,14 @@ with gr.Blocks(title="推理问答知识库") as demo:
 
     with gr.Row():
         with gr.Column():
-            files_input = gr.File(
-                label="上传文档",
-                file_types=[".txt", ".docx", ".pdf", ".csv", ".json"],
-                type="filepath",
-                file_count="multiple"
-            )
-            dir_input = gr.File(
-                label="上传文件夹",
-                file_types=[".txt", ".docx", ".pdf", ".csv", ".json"],
-                type="filepath",
-                file_count="directory"
-            )
+            files_input = gr.File(label="上传文档", file_types=[".txt", ".docx", ".pdf", ".csv", ".json"], type="filepath", file_count="multiple")
+            dir_input = gr.File(label="上传文件夹", file_types=[".txt", ".docx", ".pdf", ".csv", ".json"], type="filepath", file_count="directory")
 
             with gr.Row():
                 collection_choice = gr.Dropdown(
-                    label="选择加载到的知识库",
-                    choices=doc_bases,
-                    multiselect=False,
-                    value=doc_bases[0] if doc_bases else None,
-                    interactive=True
+                    label="选择加载到的知识库", choices=doc_bases, multiselect=False, value=doc_bases[0] if doc_bases else None, interactive=True
                 )
-                new_collection_input = gr.Textbox(
-                    label="新建知识库",
-                    placeholder="输入新知识库名称",
-                    interactive=True
-                )
+                new_collection_input = gr.Textbox(label="新建知识库", placeholder="输入新知识库名称", interactive=True)
                 add_collection_btn = gr.Button("添加")
 
             file_name = gr.Textbox(label="文件名", visible=False)
@@ -345,13 +292,7 @@ with gr.Blocks(title="推理问答知识库") as demo:
 
             upload_output = gr.Textbox(label="上传状态", interactive=False)
 
-            collections_dropdown = gr.Dropdown(
-                label="选择知识库集合",
-                choices=doc_bases,
-                multiselect=True,
-                value=None,
-                interactive=True
-            )
+            collections_dropdown = gr.Dropdown(label="选择知识库集合", choices=doc_bases, multiselect=True, value=None, interactive=True)
 
         with gr.Column():
             chat = gr.ChatInterface(
@@ -359,7 +300,6 @@ with gr.Blocks(title="推理问答知识库") as demo:
                 title="Thinking LLM Chat Interface 🤔",
                 type="messages",
             )
-
 
     # 处理文件上传
     def on_file_select(file):
@@ -372,32 +312,19 @@ with gr.Blocks(title="推理问答知识库") as demo:
             logger.info(f"文件名: {os.path.basename(file)}, 路径:{os.path.splitext(file)[1]}")
 
             return os.path.basename(file), os.path.splitext(file)[1]
-        elif hasattr(file, 'name'):
+        elif hasattr(file, "name"):
             logger.info(f"文件名: {file.name}, 路径:{os.path.splitext(file.name)[1]}")
 
             return file.name, os.path.splitext(file.name)[1]
         else:
             return "已选择文件（未知格式）", ".txt"
 
-
-    files_input.change(
-        fn=on_file_select,
-        inputs=[files_input],
-        outputs=[file_name, upload_output]
-    )
+    files_input.change(fn=on_file_select, inputs=[files_input], outputs=[file_name, upload_output])
 
     # 处理上传文件按钮点击
-    upload_button.click(
-        fn=process_uploaded_file,
-        inputs=[files_input, dir_input, collection_choice],
-        outputs=[upload_output, gr.State(), gr.State()]
-    )
+    upload_button.click(fn=process_uploaded_file, inputs=[files_input, dir_input, collection_choice], outputs=[upload_output, gr.State(), gr.State()])
 
-    add_collection_btn.click(
-        fn=add_new_collection,
-        inputs=new_collection_input,
-        outputs=[collection_choice, collections_dropdown]
-    )
+    add_collection_btn.click(fn=add_new_collection, inputs=new_collection_input, outputs=[collection_choice, collections_dropdown])
 
 
 # 启动应用

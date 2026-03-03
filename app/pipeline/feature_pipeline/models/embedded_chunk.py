@@ -81,7 +81,6 @@ class RepositoryEmbeddedChunkModel(VectorDBDataModel):
         return self.chunk_id, self.embedded_content, data
 
 
-
 class DocumentEmbeddedChunkModel(VectorDBDataModel):
     entry_id: str
     knowledge_id: str
@@ -90,9 +89,10 @@ class DocumentEmbeddedChunkModel(VectorDBDataModel):
     filename: str
     chunk_id: str
     chunk_content: str
-    #hybrid_vec: dict
+    # hybrid_vec: dict
     embedded_content: np.ndarray
     user_id: str | None = None
+    images: list[dict] | None = None
     type: str
 
     class Config:
@@ -100,14 +100,22 @@ class DocumentEmbeddedChunkModel(VectorDBDataModel):
 
     def to_payload(self) -> Tuple[str, dict, dict]:
         data = {
+            "kind": "chunk",
             "knowledge_id": self.knowledge_id,
             "doc_id": self.doc_id,
             "path": self.path,
             "filename": self.filename,
             "user_id": self.user_id,
+            # Keep "content" for backward compat; add "text" so the
+            # knowledge API can read it directly without fallback.
             "content": self.chunk_content,
+            "text": self.chunk_content,
+            "title": self.filename,
+            "source": self.path,
             "type": self.type,
         }
+        if self.images:
+            data["images"] = self.images
 
-        return self.chunk_id,  self.embedded_content, data
-        #return self.chunk_id, self.hybrid_vec, data
+        return self.chunk_id, self.embedded_content, data
+        # return self.chunk_id, self.hybrid_vec, data

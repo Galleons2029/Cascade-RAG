@@ -1,6 +1,29 @@
 .idea/
 .rabbitmq/
+.env
+data/
+.venv/
 
+# Langgraph checkpoint
+.langgraph_api/
+
+# Python bytecode cache
+__pycache__/
+
+# Jupyter Book outputs
+**/jupyterbook/
+
+# Notebook files
+*.ipynb
+
+# test output files
+*.pyc
+**/*.pyc
+
+# VSCode settings
 .vscode/
 
-.DS_Store
+# Ignore log files
+*.log
+app/pipeline/feature_pipeline/utils/logs
+app/core/agent/graph/logs

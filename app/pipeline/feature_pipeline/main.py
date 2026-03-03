@@ -4,7 +4,7 @@
 # @File    : main.py
 
 """
- 管道调度脚本
+管道调度脚本
 """
 
 import bytewax.operators as op
@@ -31,9 +31,7 @@ op.output(
     QdrantOutput(connection=connection, sink_type="clean"),
 )
 stream = op.flat_map("分块调度", stream, ChunkingDispatcher.dispatch_chunker)
-stream = op.map(
-    "嵌入块调度", stream, EmbeddingDispatcher.dispatch_embedder
-)
+stream = op.map("嵌入块调度", stream, EmbeddingDispatcher.dispatch_embedder)
 op.output(
     "嵌入数据导入到qdrant",
     stream,

@@ -28,9 +28,7 @@ class UnstructuredPDFExtractor(BaseExtractor):
         if self._api_url:
             from unstructured.partition.api import partition_via_api
 
-            elements = partition_via_api(
-                filename=self._file_path, api_url=self._api_url, api_key=self._api_key, strategy="auto"
-            )
+            elements = partition_via_api(filename=self._file_path, api_url=self._api_url, api_key=self._api_key, strategy="auto")
         else:
             from unstructured.partition.pdf import partition_pdf
 

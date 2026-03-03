@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 from app.core.logger_utils import get_logger
-from app.core.config import settings
 from app.core.rag.retriever import VectorRetriever
 
 # To mimic using multiple Python modules, such as 'core' and 'feature_pipeline',
@@ -11,15 +10,7 @@ ROOT_DIR = str(Path(__file__).parent)
 sys.path.append(ROOT_DIR)
 
 
-
-
 logger = get_logger(__name__)
-
-settings.patch_localhost()
-logger.warning(
-    "Patched settings to work with 'localhost' URLs. \
-    Remove the 'settings.patch_localhost()' call from above when deploying or running inside Docker."
-)
 
 if __name__ == "__main__":
     query = """

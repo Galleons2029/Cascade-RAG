@@ -33,7 +33,7 @@ from app.models.auth import (
     UserCreate,
     UserResponse,
 )
-from app.core.db.db_services import DatabaseService
+from app.core.db.db_services import database_service as db_service
 from app.utils.auth import (
     create_access_token,
     verify_token,
@@ -46,7 +46,7 @@ from app.utils.sanitization import (
 
 router = APIRouter()
 security = HTTPBearer()
-db_service = DatabaseService()
+# Use shared async database service singleton
 
 
 async def get_current_user(
@@ -183,9 +183,7 @@ async def register_user(request: Request, user_data: UserCreate):
 
 
 @router.post("/login", response_model=TokenResponse)
-async def login(
-    request: Request, username: str = Form(...), password: str = Form(...), grant_type: str = Form(default="password")
-):
+async def login(request: Request, username: str = Form(...), password: str = Form(...), grant_type: str = Form(default="password")):
     """Login a user.
 
     Args:
@@ -263,9 +261,7 @@ async def create_session(user: User = Depends(get_current_user)):
 
 
 @router.patch("/session/{session_id}/name", response_model=SessionResponse)
-async def update_session_name(
-    session_id: str, name: str = Form(...), current_session: Session = Depends(get_current_session)
-):
+async def update_session_name(session_id: str, name: str = Form(...), current_session: Session = Depends(get_current_session)):
     """Update a session's name.
 
     Args:

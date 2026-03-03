@@ -10,7 +10,7 @@ This file contains the graph utilities for the application.
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import trim_messages as _trim_messages
 
-from app.core.config import settings
+from app.configs import agent_config as settings
 from app.models import Message
 
 
@@ -47,4 +47,3 @@ def prepare_messages(messages: list[Message], llm: BaseChatModel, system_prompt:
         allow_partial=False,
     )
     return [Message(role="system", content=system_prompt)] + trimmed_messages
-

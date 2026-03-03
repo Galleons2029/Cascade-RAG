@@ -8,9 +8,10 @@
 """
 
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 
-#from FlagEmbedding import BGEM3FlagModel
+os.environ["CUDA_VISIBLE_DEVICES"] = "2"
+
+# from FlagEmbedding import BGEM3FlagModel
 # from app.pipeline.feature_pipeline.utils.embeddings import hybrid_embedding, embedd_text
 # import numpy as np
 #

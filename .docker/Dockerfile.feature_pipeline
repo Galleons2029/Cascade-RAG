@@ -1,5 +1,5 @@
 # Use an official Python runtime as a parent image
-FROM python:3.11-slim-bullseye
+FROM python:3.11-slim
 
 ENV WORKSPACE_ROOT=/usr/src/app \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -11,13 +11,11 @@ ENV WORKSPACE_ROOT=/usr/src/app \
 RUN mkdir -p $WORKSPACE_ROOT
 
 # Install system dependencies
-RUN sed -i 's|http://deb.debian.org/debian|https://mirrors.tuna.tsinghua.edu.cn/debian|g' /etc/apt/sources.list \
-    && apt-get update -y \
+RUN apt-get update -y \
     && apt-get install -y --no-install-recommends build-essential \
     gcc \
     python3-dev \
     curl \
-    build-essential \
     && apt-get clean
 
 # Install Poetry using pip and clear cache

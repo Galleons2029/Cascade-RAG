@@ -2,12 +2,24 @@ services:
   mq:
     image: rabbitmq:4-management
     container_name: mq
+    environment:
+      # Allow the builtin guest user to connect from other containers
+      RABBITMQ_CONFIG_FILE: /etc/rabbitmq/rabbitmq.conf
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5673:5672"
-      - "15673:15672"
+      - "5672:5672"
+      - "15672:15672"
     volumes:
-      - ./rabbitmq/data/:/var/lib/rabbitmq/
-      - ./rabbitmq/log/:/var/log/rabbitmq
+      - ./data/rabbitmq/data/:/var/lib/rabbitmq/
+      - ./data/rabbitmq/log/:/var/log/rabbitmq
+      - ./.docker/rabbitmq.conf:/etc/rabbitmq/rabbitmq.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
     restart: always
 
   qdrant:
@@ -37,37 +49,58 @@ services:
 #    volumes:
 #      - timescaledb_data:/var/lib/postgresql/data
   sql_service:
-    image: postgres
+    image: ${POSTGRES_IMAGE:-postgres:16}
     container_name: postgres_db
     restart: always
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: admin
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: postgres
+      # Fallback defaults if .env is not provided
+      POSTGRES_USER: ${POSTGRES_USER:-admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-postgres}
+    # command:
+    #   - -c
+    #   - ssl=on
+    #   - -c
+    #   - ssl_cert_file=/var/lib/postgresql/data/server.crt
+    #   - -c
+    #   - ssl_key_file=/var/lib/postgresql/data/server.key
     ports:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # Place any .sql or .sh files under ./data/postgres/initdb to run once on first init
+      - ./data/postgres/initdb:/data-entrypoint-initdb.d:ro
 
 
   dragonfly:
     image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
     # Use below command if can't pull the image directly:
-    # sudo docker run --network=host --ulimit memlock=-1 docker.dragonflydb.io/dragonflydb/dragonfly
+    # sudo data run --network=host --ulimit memlock=-1 data.dragonflydb.io/dragonflydb/dragonfly
     ulimits:
       memlock: -1
     ports:
       - "6381:6379"
-    # For better performance, consider `host` mode instead `port` to avoid docker NAT.
+    # For better performance, consider `host` mode instead `port` to avoid data NAT.
     # `host` mode is NOT currently supported in Swarm Mode.
     # https://docs.docker.com/compose/compose-file/compose-file-v3/#network_mode
     # network_mode: "host"
     volumes:
       - dragonflydata:/data
 
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: falkordb
+    ports:
+      - "6379:6379"
+      - "3010:3000"
+    volumes:
+      - ./data/falkordb:/data
+
 
   feature_pipeline:
-    container_name: MiniCascade-feature-pipeline
+    container_name: feature-pipeline
     build:
       context: .
       dockerfile: .docker/Dockerfile.feature_pipeline
@@ -75,31 +108,92 @@ services:
       BYTEWAX_PYTHON_FILE_PATH: "main:flow"
       DEBUG: "false"
       BYTEWAX_KEEP_CONTAINER_ALIVE: "true"
+      DISABLE_MONGO: "true"
+      RABBITMQ_HOST: "mq"
+      QDRANT_DATABASE_HOST: "qdrant"
     env_file:
       - .env
     depends_on:
-      - mq
-      - qdrant
+      mq:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
     restart: always
 
   app:
-    container_name: MiniCascade-backend
+    container_name: Cascade-backend
     build:
       context: .
       dockerfile: .docker/Dockerfile.app
     environment:
       DEBUG: "false"
+      DISABLE_MONGO: "true"
+      RABBITMQ_HOST: "mq"
+      QDRANT_DATABASE_HOST: "qdrant"
+      POSTGRES_URL: "postgresql+psycopg_async://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@sql_service:5432/${POSTGRES_DB:-postgres}"
     env_file:
       - .env
+    ports:
+      - "8000:8000"
     depends_on:
-      - dragonfly
-      - mq
-      - qdrant
+      sql_service:
+        condition: service_started
+      dragonfly:
+        condition: service_started
+      mq:
+        condition: service_healthy
+      qdrant:
+        condition: service_started
     restart: always
+
+  langgraph:
+    container_name: langgraph-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      LANGSERVE_HOST: "0.0.0.0"
+      DATABASE_URI: "postgresql://${POSTGRES_USER:-admin}:${POSTGRES_PASSWORD:-password}@sql_service:5432/${POSTGRES_DB:-postgres}"
+      REDIS_URI: "redis://dragonfly:6379/0"
+    env_file:
+      - .env
+    ports:
+      - "2024:8000"
+    depends_on:
+      - sql_service
+      - dragonfly
+    restart: always
+
+  # frontend:
+  #   container_name: agent-chat-ui
+  #   build:
+  #     context: ./agent-chat-ui
+  #     target: dev
+  #   environment:
+  #     NODE_ENV: development
+  #     WATCHPACK_POLLING: "true"
+  #     CHOKIDAR_USEPOLLING: "true"
+  #     NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:2024}
+  #     NEXT_PUBLIC_ASSISTANT_ID: ${NEXT_PUBLIC_ASSISTANT_ID:-agent}
+  #     NEXT_PUBLIC_API_KEY: ${NEXT_PUBLIC_API_KEY:-}
+  #     NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+  #     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-}
+  #     NEXT_PUBLIC_SUPPRESS_AI_CHAT_INIT_TOAST: ${NEXT_PUBLIC_SUPPRESS_AI_CHAT_INIT_TOAST:-false}
+  #     LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+  #   ports:
+  #     - "3000:3000"
+  #   volumes:
+  #     - ./agent-chat-ui:/app
+  #   depends_on:
+  #     - langgraph
+  #   restart: always
 
 
 
 volumes:
+  mongo-replica-1-data:
+  mongo-replica-2-data:
+  mongo-replica-3-data:
   qdrant-data:
   #timescaledb_data:
   dragonflydata:

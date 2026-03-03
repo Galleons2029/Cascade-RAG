@@ -10,7 +10,9 @@ User chat session data model
 from typing import Optional, List
 from sqlmodel import SQLModel, Field, Relationship
 
+
 class Conversation(SQLModel, table=True):
+    __tablename__ = "conversation"
     id: int | None = Field(default=None, primary_key=True)
     name: str
     secret_name: str
@@ -18,9 +20,8 @@ class Conversation(SQLModel, table=True):
     llm_name: str | None = None
 
 
-
 class ChatSession(SQLModel, table=True):
-
+    __tablename__ = "chat_session"
     id: Optional[int] = Field(default=None, primary_key=True)
     llm_name: str
 
@@ -28,7 +29,7 @@ class ChatSession(SQLModel, table=True):
 
 
 class ChatHistory(SQLModel, table=True):
-
+    __tablename__ = "chat_history"
     id: Optional[int] = Field(default=None, primary_key=True)
     is_human_message: bool
     content: str
@@ -40,7 +41,6 @@ class ChatHistory(SQLModel, table=True):
 
     chat_session_id: int | None = Field(foreign_key="chat_session.id")
     chat_session: ChatSession | None = Relationship(back_populates="chat_histories")
-
 
 
 # class ChatSession(Base):

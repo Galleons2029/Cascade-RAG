@@ -1,7 +1,6 @@
-# MiniCascade-RAG
+# Bank-copilot: An Open-Source AI Agent Platform for Financial Management using LLMs
 
-
-A production-ready Reasoning RAG agent applications with LangGraph integration. Providing a robust foundation for building scalable, secure, and maintainable AI agent services.
+A production-ready Agent platform for bank financial management with LangGraph integration. Providing a robust foundation for building scalable, secure, and maintainable AI agent services.
 
 
 ## 🌟 Features
@@ -29,8 +28,8 @@ A production-ready Reasoning RAG agent applications with LangGraph integration. 
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/Galleons2029/MiniCascade-RAG.git
-cd MiniCascade-RAG
+git clone https://github.com/Galleons2029/Bank-copilot.git
+cd Bank-copilot
 ```
 
 2. Create and activate a virtual environment:
@@ -44,18 +43,23 @@ uv sync   # if not have uv use "pip install uv" for install
 ``` 
 to synchronize project environment automatically
 
+### Configuration
+- Runtime settings are loaded from `.env*` files by the config objects under `app/configs/`.
+- General app defaults live in `app/configs/agent_config.py`, database/Vector DB settings in `app/configs/db_config.py`, and LLM specifics in `app/configs/llm_config.py`.
+- Import configs in code via `from app.configs import agent_config as settings` or the specialized config you need (`qdrant_config`, `mongo_config`, `llm_config`, etc.).
+
 ### Database setup
 
 1. Create a PostgreSQL database (e.g Supabase or local PostgreSQL)
 2. Update the database connection string in your `.env` file:
 
 ```bash
-POSTGRES_URL="postgresql://:your-db-password@POSTGRES_HOST:POSTGRES_PORT/POSTGRES_DB"
+POSTGRES_URL="postgresql+psycopg_async://:your-db-password@POSTGRES_HOST:POSTGRES_PORT/POSTGRES_DB"
 ```
 
 3. Launch Qdrant：
 ```bash
-docker run -p 6333:6333 -p 6334:6334 \
+data run -p 6333:6333 -p 6334:6334 \
     -v "$(pwd)/qdrant_storage:/qdrant/storage:z" \
     qdrant/qdrant
 ```
@@ -63,14 +67,14 @@ docker run -p 6333:6333 -p 6334:6334 \
 Rabbitmq
 #### latest RabbitMQ 4.x
 ```bash
-docker run -it --rm --name rabbitmq \
+data run -it --rm --name rabbitmq \
     -p 5672:5672 -p 15672:15672 \
     rabbitmq:4-management
 ```
 
 ### Deployment use Docker Compose
 ```bash
-docker compose up
+data compose up
 ```
 
 

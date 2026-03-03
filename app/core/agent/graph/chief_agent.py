@@ -40,7 +40,8 @@ from app.configs import (
 )
 from app.core.agent.tools import tools
 from app.core.logger_utils import logger
-#from app.core.metrics import llm_inference_duration_seconds
+
+# from app.core.metrics import llm_inference_duration_seconds
 from app.core.prompts import SYSTEM_PROMPT
 from app.models import (
     GraphState,
@@ -146,7 +147,7 @@ class LangGraphAgent:
 
         for attempt in range(max_retries):
             try:
-                #with llm_inference_duration_seconds.labels(model=self.llm.model_name).time():
+                # with llm_inference_duration_seconds.labels(model=self.llm.model_name).time():
                 generated_state = {"messages": [await self.llm.ainvoke(dump_messages(messages))]}
                 logger.info(
                     "llm_response_generated",
@@ -170,9 +171,7 @@ class LangGraphAgent:
                 # In production, we might want to fall back to a more reliable model
                 if settings.ENVIRONMENT == Environment.PRODUCTION and attempt == max_retries - 2:
                     fallback_model = "gpt-4o"
-                    logger.warning(
-                        "using_fallback_model", model=fallback_model, environment=settings.ENVIRONMENT.value
-                    )
+                    logger.warning("using_fallback_model", model=fallback_model, environment=settings.ENVIRONMENT.value)
                     self.llm.model_name = fallback_model
 
                 continue
@@ -250,9 +249,7 @@ class LangGraphAgent:
                     if settings.ENVIRONMENT != Environment.PRODUCTION:
                         raise Exception("Connection pool initialization failed")
 
-                self._graph = graph_builder.compile(
-                    checkpointer=checkpointer, name=f"{settings.PROJECT_NAME} Agent ({settings.ENVIRONMENT.value})"
-                )
+                self._graph = graph_builder.compile(checkpointer=checkpointer, name=f"{settings.PROJECT_NAME} Agent ({settings.ENVIRONMENT.value})")
 
                 logger.info(
                     "graph_created",
@@ -299,17 +296,13 @@ class LangGraphAgent:
             },
         }
         try:
-            response = await self._graph.ainvoke(
-                {"messages": dump_messages(messages), "session_id": session_id}, config
-            )
+            response = await self._graph.ainvoke({"messages": dump_messages(messages), "session_id": session_id}, config)
             return self.__process_messages(response["messages"])
         except Exception as e:
             logger.error(f"Error getting response: {str(e)}")
             raise e
 
-    async def get_stream_response(
-        self, messages: list[Message], session_id: str, user_id: Optional[str] = None
-    ) -> AsyncGenerator[str, None]:
+    async def get_stream_response(self, messages: list[Message], session_id: str, user_id: Optional[str] = None) -> AsyncGenerator[str, None]:
         """Get a stream response from the LLM.
 
         Args:
@@ -322,11 +315,7 @@ class LangGraphAgent:
         """
         config = {
             "configurable": {"thread_id": session_id},
-            "callbacks": [
-                CallbackHandler(
-                    environment=settings.ENVIRONMENT.value, debug=False, user_id=user_id, session_id=session_id
-                )
-            ],
+            "callbacks": [CallbackHandler(environment=settings.ENVIRONMENT.value, debug=False, user_id=user_id, session_id=session_id)],
         }
         if self._graph is None:
             self._graph = await self.create_graph()
@@ -357,19 +346,13 @@ class LangGraphAgent:
         if self._graph is None:
             self._graph = await self.create_graph()
 
-        state: StateSnapshot = await sync_to_async(self._graph.get_state)(
-            config={"configurable": {"thread_id": session_id}}
-        )
+        state: StateSnapshot = await sync_to_async(self._graph.get_state)(config={"configurable": {"thread_id": session_id}})
         return self.__process_messages(state.values["messages"]) if state.values else []
 
     def __process_messages(self, messages: list[BaseMessage]) -> list[Message]:
         openai_style_messages = convert_to_openai_messages(messages)
         # keep just assistant and user messages
-        return [
-            Message(**message)
-            for message in openai_style_messages
-            if message["role"] in ["assistant", "user"] and message["content"]
-        ]
+        return [Message(**message) for message in openai_style_messages if message["role"] in ["assistant", "user"] and message["content"]]
 
     async def clear_chat_history(self, session_id: str) -> None:
         """Clear all chat history for a given thread ID.

@@ -2,15 +2,12 @@ import hashlib
 from abc import ABC, abstractmethod
 
 from app.pipeline.feature_pipeline.models.base import DataModel
-from app.pipeline.feature_pipeline.models.chunk import (
-    ArticleChunkModel, DocumentChunkModel, PostChunkModel, RepositoryChunkModel
-)
-from app.pipeline.feature_pipeline.models.clean import (
-    ArticleCleanedModel, DocumentCleanedModel, PostCleanedModel, RepositoryCleanedModel
-)
+from app.pipeline.feature_pipeline.models.chunk import ArticleChunkModel, DocumentChunkModel, PostChunkModel, RepositoryChunkModel
+from app.pipeline.feature_pipeline.models.clean import ArticleCleanedModel, DocumentCleanedModel, PostCleanedModel, RepositoryCleanedModel
 from app.pipeline.feature_pipeline.utils.chunking import chunk_text
 
 from app.core import get_logger
+
 logger = get_logger(__name__)
 
 
@@ -90,6 +87,7 @@ class RepositoryChunkingHandler(ChunkingDataHandler):
 
         return data_models_list
 
+
 class DocumentChunkingHandler(ChunkingDataHandler):
     def chunk(self, data_model: DocumentCleanedModel) -> list[DocumentChunkModel]:
         data_models_list = []
@@ -110,6 +108,7 @@ class DocumentChunkingHandler(ChunkingDataHandler):
                 chunk_content=chunk,
                 user_id=data_model.user_id,
                 image=data_model.image if data_model.image else None,
+                images=data_model.images,
                 type=data_model.type,
             )
             data_models_list.append(model)

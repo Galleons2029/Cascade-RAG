@@ -1,9 +1,13 @@
 {
     "dockerfile_lines": [],
     "graphs": {
-      "demo": "./app/core/agent/graph/rag_agent.py:rag_agent"
+      "instructor_agent": "./app/core/agent/graph/instructor_agent.py:instructor_agent",
+      "rag_agent": "./app/core/agent/graph/rag_agent.py:rag_agent",
+      "default_agent": "./app/core/agent/graph/default_agent.py:default_agent",
+      "kb_manager_agent": "./app/core/agent/graph/kb_manager.py:kb_manager_graph",
+      "deep_research_agent": "./app/core/agent/deep_research/agent.py:agent"
     },
-    "python_version": "3.11",
+    "python_version": "3.12",
     "env": ".env",
     "dependencies": [
       "."

@@ -6,14 +6,22 @@
 """
 依赖配置脚本
 """
+
 from langfuse import Langfuse
-from dotenv import load_dotenv
-import os
-load_dotenv()
+from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker
+from sqlmodel.ext.asyncio.session import AsyncSession
 
+from app.configs import agent_config as settings
+from app.core.db.postgre import async_session, engine
 
+# Centralized Langfuse client configured from environment via AgentConfig
 langfuse = Langfuse(
-  secret_key=os.getenv('SECRET_KEY'),
-  public_key=os.getenv('PUBLIC_KEY'),
-  host="http://localhost:3000"
+    public_key=settings.LANGFUSE_PUBLIC_KEY,
+    secret_key=settings.LANGFUSE_SECRET_KEY,
+    host=settings.LANGFUSE_HOST,
 )
+
+
+# Expose async engine/session maker for legacy imports; prefer using app.core.db.postgre directly.
+postgres_engine: AsyncEngine = engine
+AsyncSessionMaker: async_sessionmaker[AsyncSession] = async_session

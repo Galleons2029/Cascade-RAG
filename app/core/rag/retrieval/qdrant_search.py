@@ -7,6 +7,7 @@
 这里是文件说明
 """
 
+
 def search(self, text: str):
     # Convert text query into vector
     vector = self.model.encode(text).tolist()

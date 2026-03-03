@@ -7,7 +7,15 @@
 rag 向量检索
 """
 
+from fastapi import APIRouter
 
+router = APIRouter()
+
+
+@router.get("/", summary="Search placeholder")
+async def search_placeholder():
+    """Placeholder search endpoint."""
+    return {"message": "search service not yet implemented"}
 
 
 # from PIL import Image

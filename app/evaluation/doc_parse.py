@@ -7,20 +7,20 @@
 文档上传
 """
 
-
 import uuid
 
 from app.core.mq import publish_to_rabbitmq
-from app.core.config import settings
+from app.configs import llm_config, qdrant_config
 from app.core import logger_utils
 from app.pipeline.feature_pipeline.models.raw import DocumentRawModel
-from qdrant_client import QdrantClient,models
+from qdrant_client import QdrantClient, models
 
 logger = logger_utils.get_logger(__name__)
 
-client = QdrantClient(url="http://localhost:6333")
+# 使用配置中的 Qdrant 连接信息，兼容 Docker 和本地部署
+client = QdrantClient(host=qdrant_config.QDRANT_DATABASE_HOST, port=qdrant_config.QDRANT_DATABASE_PORT)
 
-collection_name = 'test1'
+collection_name = "test1"
 try:
     client.get_collection(collection_name=collection_name)
 except Exception:
@@ -30,11 +30,15 @@ except Exception:
     )
     client.create_collection(
         collection_name=collection_name,
-        vectors_config=models.VectorParams(size=settings.EMBEDDING_SIZE, distance=models.Distance.COSINE),
+        vectors_config=models.VectorParams(size=llm_config.EMBEDDING_SIZE, distance=models.Distance.COSINE),
         quantization_config=models.ScalarQuantization(
-            scalar=models.ScalarQuantizationConfig(type=models.ScalarType.INT8, quantile=0.99, always_ram=True, ), ),
+            scalar=models.ScalarQuantizationConfig(
+                type=models.ScalarType.INT8,
+                quantile=0.99,
+                always_ram=True,
+            ),
+        ),
     )
-
 
 
 doc = """
@@ -189,20 +193,19 @@ Despite its advancements, Agentic RAG faces some challenges:
 • Coordination Complexity: Managing interactions between agents requires sophisticated orchestration mechanisms.
 • Computational Overhead: The use of multiple agents increases resource requirements for complex workflows.
 • Scalability Limitations: While scalable, the dynamic nature of the system can strain computational resources for high query volumes.
-Agentic RAG excels in domains like customer support, financial analytics, and adaptive learning platforms, where dynamic adaptability and contextual precision are paramount.""" # noqa: E501
+Agentic RAG excels in domains like customer support, financial analytics, and adaptive learning platforms, where dynamic adaptability and contextual precision are paramount."""  # noqa: E501
 
 
 data = DocumentRawModel(
-                    knowledge_id=collection_name,
-                    doc_id="222",
-                    path='file',
-                    filename='file',
-                    content=doc,
-                    type="documents",
-                    entry_id=str(uuid.uuid4()),
-                ).model_dump_json()
+    knowledge_id=collection_name,
+    doc_id="222",
+    path="file",
+    filename="file",
+    content=doc,
+    type="documents",
+    entry_id=str(uuid.uuid4()),
+).model_dump_json()
 
 
-
-publish_to_rabbitmq(queue_name='test_files', data=data)
+publish_to_rabbitmq(queue_name="test_files", data=data)
 logger.info(f"成功处理并发送文件：{data}")

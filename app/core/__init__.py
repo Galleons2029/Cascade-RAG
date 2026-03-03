@@ -1,13 +1,8 @@
-from . import db, logger_utils
+from . import logger_utils
 from .logger_utils import get_logger
 
 logger = get_logger(__file__)
 
-# try:
-#     #from .opik_utils import configure_opik
-#
-#     #configure_opik()
-# except:
-#     logger.warning("Could not configure Opik.")
-
-__all__ = ["get_logger", "logger_utils", "db"]
+# Lazy utilities only: importing app.core should not trigger heavy DB deps.
+# Access `app.core.db` via explicit imports when needed.
+__all__ = ["get_logger", "logger_utils"]

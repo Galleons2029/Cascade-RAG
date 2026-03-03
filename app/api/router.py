@@ -3,85 +3,41 @@
 # @Author  : Galleons
 # @File    : routers.py
 
-"""
-RAG 知识库平台 API 终端
-"""
+"""API route composition for v1 endpoints."""
 
-from typing import Annotated
-import logging
-from fastapi import FastAPI, APIRouter, Header, HTTPException
-from pydantic import BaseModel
-from app.api.v1 import inference_v1
-from contextlib import asynccontextmanager
-from app.core.db.postgre import engine
+from fastapi import APIRouter
 
-
-# 配置日志格式
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(message)s'
+from app.api import services
+from app.api.v1 import (
+    agent_v1,
+    chat_v1,
+    doc_parse,
+    inference_v1,
+    insert_v1,
+    kb_manager_v1,
+    knowledge_v1,
+    search_v1,
+    user_management_v1,
 )
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # 可在此放置启动检查，如 ping DB
-    async with engine.begin() as conn:
-        await conn.run_sync(lambda c: None)  # 简单握手
-    yield
-    await engine.dispose()  # 释放连接池
-
 
 api_router = APIRouter()
 
+# Core APIs
+api_router.include_router(agent_v1.router, prefix="/agent", tags=["agent"])
+api_router.include_router(chat_v1.router, prefix="/chat", tags=["chat"])
+api_router.include_router(doc_parse.router, prefix="/doc", tags=["doc"])
+api_router.include_router(insert_v1.router, prefix="/insert", tags=["insert"])
+api_router.include_router(search_v1.router, prefix="/search", tags=["search"])
+api_router.include_router(services.auth.router, prefix="/auth", tags=["auth"])
 
+# User Management APIs
+api_router.include_router(
+    user_management_v1.router, 
+    prefix="/user-management", 
+    tags=["user-management"]
+)
+
+# Existing modules
 api_router.include_router(inference_v1.router, prefix="/inference", tags=["inference-v1"])
-
-# api_router.include_router(chat_v3.router, prefix="/v3", tags=["chat-v3"])
-# api_router.include_router(chat_v2.router, prefix="/v1", tags=["chat-v2"])
-
-
-fake_secret_token = "coneofsilence"
-
-fake_db = {
-    "foo": {"id": "foo", "title": "Foo", "description": "There goes my hero"},
-    "bar": {"id": "bar", "title": "Bar", "description": "The bartenders"},
-}
-
-
-
-
-class Item(BaseModel):
-    id: str
-    title: str
-    description: str | None = None
-
-
-@api_router.get("/items/{item_id}", response_model=Item)
-async def read_main(item_id: str, x_token: Annotated[str, Header()]):
-    if x_token != fake_secret_token:
-        raise HTTPException(status_code=400, detail="Invalid X-Token header")
-    if item_id not in fake_db:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return fake_db[item_id]
-
-
-@api_router.post("/items/", response_model=Item)
-async def create_item(item: Item, x_token: Annotated[str, Header()]):
-    if x_token != fake_secret_token:
-        raise HTTPException(status_code=400, detail="Invalid X-Token header")
-    if item.id in fake_db:
-        raise HTTPException(status_code=409, detail="Item already exists")
-    fake_db[item.id] = item
-    return item
-
-
-if __name__ == "__main__":
-    import uvicorn
-
-    uvicorn.run(
-        "routers:api_router",
-        host="0.0.0.0",
-        port=9011,
-        # reload=True,
-    )
+api_router.include_router(knowledge_v1.router, tags=["knowledge"])
+api_router.include_router(kb_manager_v1.router, prefix="/kb-manager", tags=["kb-manager"])

@@ -5,7 +5,7 @@ from typing_extensions import TypedDict
 
 from langgraph.graph import StateGraph, START
 from langgraph.graph.message import add_messages
-from app.core.config import settings
+from app.configs import llm_config
 
 
 class State(TypedDict):
@@ -15,11 +15,14 @@ class State(TypedDict):
 graph_builder = StateGraph(State)
 
 
-llm = init_chat_model("Qwen/Qwen3-8B",
-                          model_provider='openai',
-                          api_key=settings.Silicon_api_key3,
-                          base_url=settings.Silicon_base_url,
-                          temperature=0)
+llm = init_chat_model(
+    llm_config.LLM_MODEL or "Qwen/Qwen3-8B",
+    model_provider="openai",
+    api_key=llm_config.SILICON_KEY,
+    base_url=llm_config.SILICON_BASE_URL,
+    temperature=0,
+)
+
 
 def chatbot(state: State):
     return {"messages": [llm.invoke(state["messages"])]}
@@ -39,5 +42,4 @@ def stream_graph_updates(user_input: str):
             print("Assistant:", value["messages"][-1].content)
 
 
-stream_graph_updates('djawiodj')
-
+stream_graph_updates("djawiodj")

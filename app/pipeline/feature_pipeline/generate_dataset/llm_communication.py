@@ -5,9 +5,7 @@ from core import get_logger
 from openai import OpenAI
 
 MAX_LENGTH = 16384
-SYSTEM_PROMPT = (
-    "You are a technical writer handing someone's account to post about AI and MLOps."
-)
+SYSTEM_PROMPT = "You are a technical writer handing someone's account to post about AI and MLOps."
 
 logger = get_logger(__name__)
 
@@ -32,9 +30,7 @@ class GptCommunicator:
             response = chat_completion.choices[0].message.content
             return json.loads(self.clean_response(response))
         except Exception:
-            logger.exception(
-                "Skipping batch! An error occurred while communicating with API."
-            )
+            logger.exception("Skipping batch! An error occurred while communicating with API.")
 
             return []
 

@@ -6,17 +6,20 @@
 """
 timescaledb schema
 """
+
 from datetime import datetime
 from typing import List, Optional
+
 # from pydantic import BaseModel, Field
 from sqlmodel import SQLModel, Field
 from timescaledb import TimescaleModel
 
 # page visits at any given time
 
+
 class EventModel(TimescaleModel, table=True):
-    page: str = Field(index=True) # /about, /contact, # pricing
-    user_agent: Optional[str] = Field(default="", index=True) # browser
+    page: str = Field(index=True)  # /about, /contact, # pricing
+    user_agent: Optional[str] = Field(default="", index=True)  # browser
     ip_address: Optional[str] = Field(default="", index=True)
     referrer: Optional[str] = Field(default="", index=True)
     session_id: Optional[str] = Field(index=True)
@@ -28,7 +31,7 @@ class EventModel(TimescaleModel, table=True):
 
 class EventCreateSchema(SQLModel):
     page: str
-    user_agent: Optional[str] = Field(default="", index=True) # browser
+    user_agent: Optional[str] = Field(default="", index=True)  # browser
     ip_address: Optional[str] = Field(default="", index=True)
     referrer: Optional[str] = Field(default="", index=True)
     session_id: Optional[str] = Field(index=True)
@@ -40,6 +43,7 @@ class EventCreateSchema(SQLModel):
 
 
 # {"id": 12}
+
 
 class EventListSchema(SQLModel):
     results: List[EventModel]

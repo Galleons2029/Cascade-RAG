@@ -29,6 +29,7 @@ class ChatHistoryCreate(ChatMessageCreate):
     metadata_system_fingerprint: Optional[str] = None
     external_id: Optional[str] = None
 
+
 class ChatHistoryResponse(BaseModel):
     id: int
     content: str

@@ -6,12 +6,11 @@ def chunk_documents(documents: list[str], min_length: int = 1000, max_length: in
     for document in documents:
         chunks = extract_substrings(document, min_length=min_length, max_length=max_length)
         chunked_documents.extend(chunks)
-        
+
     return chunked_documents
 
-def extract_substrings(
-    text: str, min_length: int = 1000, max_length: int = 2000
-) -> list[str]:
+
+def extract_substrings(text: str, min_length: int = 1000, max_length: int = 2000) -> list[str]:
     sentences = re.split(r"(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|\!)\s", text)
 
     extracts = []

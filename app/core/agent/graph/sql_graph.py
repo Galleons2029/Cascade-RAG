@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-# @Time    : 2025/8/28 15:39 
+# @Time    : 2025/8/28 15:39
 # @Author  : zqh
 # @File    : sql_graph.py
+import os
 import re
 from typing import Any, Literal, List
 
@@ -12,10 +13,11 @@ from langgraph.constants import START, END
 from langgraph.graph import StateGraph, MessagesState
 from langchain_core.messages import BaseMessage, HumanMessage
 from app.configs import postgres_config
-from app.core.agent.sql_agent.graph.sql_prompt import DECOMPOSE_QUESTION_PROMPT, WRITE_QUERY_PROMPT, \
-    MERGE_RESULTS_PROMPT, CHECK_QUERY_PROMPT, REWRITE_QUERY_PROMPT
+from app.core.agent.graph.sql_prompt import  WRITE_QUERY_PROMPT,  CHECK_QUERY_PROMPT, REWRITE_QUERY_PROMPT,detailed_info_prompt
 from app.core.config import settings
-
+from dotenv import load_dotenv
+from app.core.agent.graph.bank_flow import execute_query_tool
+load_dotenv()
 pg_host = postgres_config.PG_HOST
 pg_port = postgres_config.PG_PORT
 pg_user = postgres_config.PG_USER
@@ -23,11 +25,12 @@ pg_password = postgres_config.PG_PASSWORD
 pg_db = postgres_config.PG_DB
 db_uri = f"postgresql+psycopg://{pg_user}:{pg_password}@{pg_host}:{pg_port}/{pg_db}"
 db=SQLDatabase.from_uri(db_uri)
-API_KEY = "sk-wdsylcaafxprwpvyrlmpvhsrpjzgrdnftpstmpgzeknwzpsq"
-BASE_URL = settings.Silicon_base_url
+API_KEY = os.getenv("SILICON_KEY") or os.getenv("SILICON_API_KEY")
+BASE_URL = os.getenv("SILICON_BASE_URL") or os.getenv("API_KEY")
+MODEL_NAME = os.getenv("LLM_MODEL") or "deepseek-ai/DeepSeek-V3"
 num_turns = 1
 sql_llm = ChatOpenAI(
-    model="Qwen/Qwen3-8B",
+    model=MODEL_NAME,
     api_key=API_KEY,
     base_url=BASE_URL,
     temperature=0.0
@@ -36,10 +39,7 @@ class State(MessagesState):
     research_topic: str
     raw_notes: str
     compressed_research: str
-    #feedback: str
-    #num_turns: int
     researcher_messages: list[BaseMessage]
-
 
 def parse_query(message: BaseMessage) -> str | None:
     result = None
@@ -50,109 +50,40 @@ def parse_query(message: BaseMessage) -> str | None:
 
 def get_table_info() -> str:
     """Parse the table information from a string and return it in a dictionary format."""
-    import psycopg2
-    # 连接到数据库
-    conn = psycopg2.connect(
-        host=pg_host,
-        port=pg_port,
-        user=pg_user,
-        password=pg_password,
-        dbname=pg_db
-    )
-
-    # 创建游标
-    cur = conn.cursor()
-
-    # 查询数据库中所有表及其列信息
-    cur.execute("""
-                SELECT table_name, column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                """)
-
-    # 获取查询结果
-    rows = cur.fetchall()
-
-    # 将表及其列信息保存到字典中
-    tables_columns = {}
-    for row in rows:
-        table_name, column_name = row
-        if table_name not in tables_columns:
-            tables_columns[table_name] = []
-        tables_columns[table_name].append(column_name)
-
-    # 关闭游标和连接
-    cur.close()
-    conn.close()
-    # 将字典转换为格式化的字符串
-    formatted_str = ""
-    for table, columns in tables_columns.items():
-        formatted_str += f"Table: {table}\n"
-        formatted_str += "Columns: " + ", ".join(columns) + "\n\n"
-
-    return formatted_str
+    original_info=db.get_table_info()
+    detail_info=detailed_info_prompt
+    return original_info+"\n"+detail_info
 
 
 def write_query(state: State):
     """
-    1. 拆解问题 -> 子问题列表
-    2. 对每个子问题生成 SQL 并执行
-    3. 用 LLM 合并结果，生成最终 SQL
+    直接用 LLM 通过 prompt 生成单个 SQL 查询
     """
-
-    # ---------- 1. 拆解问题 ----------
-    decompose_prompt = DECOMPOSE_QUESTION_PROMPT.invoke({"input": state["research_topic"]})
-    decompose_res = invoke_prompt(decompose_prompt)
-    sub_questions: List[str] = [q.strip() for q in decompose_res.content.splitlines() if q.strip() and q.strip()[0].isdigit()]
-    # if not sub_questions:               # 兜底：拆不出时退化成原问题
-    #     sub_questions = [state["question"]]
-    # ---------- 2. 子问题逐个生成 & 执行 ----------
-    sub_details = []
-    execute_tool = QuerySQLDatabaseTool(db=db)
-    for sq in sub_questions:
-        sq_prompt = WRITE_QUERY_PROMPT.invoke({
-            "dialect": "postgresql",
-            "input": sq,
-            "table_info": get_table_info(),
-        })
-        sq_llm_res = invoke_prompt(sq_prompt)
-        sq_sql = parse_query(sq_llm_res) or sq_llm_res.content
-
-        # 执行子查询
-        try:
-            sq_exec = execute_tool.invoke(sq_sql)
-        except Exception as e:
-            sq_exec = f"Error: {e}"
-
-        sub_details.append(f"Sub-question: {sq}\nSQL:\n{sq_sql}\nResult:\n{sq_exec}")
-    # ---------- 3. 生成最终合并 SQL ----------
-    merge_prompt = MERGE_RESULTS_PROMPT.invoke({
-        "question": state["research_topic"],
-        "sub_details": "\n\n".join(sub_details)
+    prompt = WRITE_QUERY_PROMPT.invoke({
+        "dialect": "postgresql",
+        "input": state["research_topic"],
+        "table_info": get_table_info(),
     })
-    final_res = invoke_prompt(merge_prompt)
-    final_sql = parse_query(final_res) or final_res.content
+    llm_res = invoke_prompt(prompt)
+    sql_query = parse_query(llm_res) or llm_res.content
+
     messages = [
-        *decompose_prompt.messages, decompose_res,
-        *merge_prompt.messages, final_res
+        *prompt.messages, llm_res
     ]
     return {
         **state,
-        "raw_notes": final_sql,
+        "raw_notes": sql_query,
         "researcher_messages": messages,
     }
 
-
 def execute_query(state: State) -> State:
     """Execute SQL query."""
-
-    execute_query_tool = QuerySQLDatabaseTool(db=db)
     execution_result = execute_query_tool.invoke(state["raw_notes"])
-    if not isinstance(execution_result, str):
-        # Convert to string if it's not already
-        execution_result = str(execution_result)
-    return {**state, "compressed_research": execution_result}
+    # if not isinstance(execution_result, str):
+    #     # Convert to string if it's not already
+    #     execution_result = str(execution_result)
 
+    return {**state, "compressed_research": execution_result}
 
 def truncate_execuion(execution: str) -> str:
     """Truncate the execution result to a reasonable length."""
@@ -160,14 +91,8 @@ def truncate_execuion(execution: str) -> str:
         return execution[: 2048] + "\n... (truncated)"
     return execution
 
-
 def invoke_prompt(prompt: Any) -> BaseMessage:
     try:
-        # # 使用结构化输出 - 确保模型返回JSON
-        # structured_llm = sql_llm.with_structured_output(
-        #     schema=QueryOutput,
-        #     method="json_mode"
-        # )
         result = sql_llm.invoke(prompt)
     except Exception as e:
         #logger.error(f"Failed to invoke prompt: {e}")
@@ -196,16 +121,31 @@ def check_query(state: State) -> State:
     }
     return res
 
+
 def rewrite_query(state: State) -> State:
     """Rewrite SQL query if necessary."""
     global num_turns
-    num_turns = num_turns+1
+    num_turns = num_turns + 1
+
+    # 从 check_query 的结果中提取 feedback
+    # feedback 应该是 check_query 返回的最后一个消息内容
+    feedback = ""
+    researcher_messages = state.get("researcher_messages", [])
+    if researcher_messages:
+        # 获取最后一个消息作为 feedback
+        last_message = researcher_messages[-1]
+        if hasattr(last_message, 'content'):
+            feedback = last_message.content
+        elif isinstance(last_message, dict) and 'content' in last_message:
+            feedback = last_message['content']
+
     prompt = REWRITE_QUERY_PROMPT.invoke(
         {
             "dialect": "postgresql",
             "input": state["research_topic"],
             "query": state["raw_notes"],
             "execution": truncate_execuion(state["compressed_research"]),
+            "feedback": feedback,  # 添加 feedback 参数
             "table_info": get_table_info(),
         }
     )
@@ -216,9 +156,8 @@ def rewrite_query(state: State) -> State:
     return {
         **state,
         "raw_notes": rewritten_query or state["raw_notes"],
-        "compressed_research": [*prompt.messages, result],  # clear previous prompts
+        "compressed_research": [*prompt.messages, result],
     }
-
 
 def should_continue(state: State) -> Literal[END, "rewrite_query"]:  # type: ignore
     """Determine if the agent should continue based on the result."""
@@ -258,8 +197,43 @@ builder.add_edge("rewrite_query", "execute_query")
 sql_graph_test=builder.compile()
 
 
+def _stringify_execution(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value
+    try:
+        return str(value)
+    except Exception:
+        return ""
+
+
+def run_sql_graph(question: str) -> dict[str, Any]:
+    global num_turns
+    num_turns = 1
+    result = sql_graph_test.invoke({"research_topic": question})
+    sql_query = result.get("raw_notes", "")
+    execution = _stringify_execution(result.get("compressed_research", ""))
+    if isinstance(result.get("compressed_research", ""), list) and not result.get("compressed_research"):
+        execution = "No rows found; the underlying tables may be missing data for the requested org/sbj/ccy/dt or there were no transactions that day."
+    if execution == "[]":
+        execution = "No rows found; the underlying tables may be missing data for the requested org/sbj/ccy/dt or there were no transactions that day."
+    messages = result.get("researcher_messages", []) or []
+    message_lines = []
+    for msg in messages:
+        content = getattr(msg, "content", None)
+        if content:
+            message_lines.append(str(content))
+    return {
+        "sql_query": sql_query,
+        "sql_result": execution,
+        "sql_messages": message_lines,
+    }
+
+
 if __name__ == "__main__":
-    question = "Find the first names of the faculty members who are playing Canoeing or Kayaking."
+    question = "科目号01018114、机构号001570661、币种DUS在2025-06-08的分户余额差是多少？"
+    print("问题: " + question)
     try:
         result = sql_graph_test.invoke({"research_topic": question})
         print("\n" + "=" * 50)

@@ -170,7 +170,6 @@ class EmbeddingDispatcher:
         data_type = data_model.type
         logger.info(f"开始嵌入分块，类型为 {data_type}: {data_model}")
 
-
         handler = cls.cleaning_factory.create_handler(data_type)
         embedded_chunk_model = handler.embedd(data_model)
 

@@ -24,7 +24,6 @@ class PostsRawModel(DataModel):
     image: Optional[str] = None
 
 
-
 class DocumentRawModel(DataModel):
     knowledge_id: str
     doc_id: str
@@ -33,3 +32,4 @@ class DocumentRawModel(DataModel):
     content: str
     user_id: str | None = None
     image: Optional[str] = None
+    images: Optional[list[dict]] = None

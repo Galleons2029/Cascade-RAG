@@ -1,6 +1,6 @@
 # 1. Base Image
 # Use a slim Python image matching the project's version
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # 2. Set Environment Variables
 # Prevents Python from writing pyc files and buffers stdout and stderr
@@ -31,11 +31,8 @@ COPY ./app .
 
 # 7. Expose Port
 # Expose the default port for Gradio applications
-EXPOSE 7860
+EXPOSE 8000
 
 # 8. Set Default Command
-# Run the Gradio application, binding to 0.0.0.0 to make it accessible outside the container
-CMD ["uv", "run", "/app/ui/chatbot_v1.py"]
-
-CMD ["uv", "run", "/app/ui/gradio_chat.py"]
-
+# Run FastAPI with uvicorn on port 8000 for dockerized access from host.
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "*"]

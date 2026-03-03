@@ -10,6 +10,4 @@ sys.path.append(ROOT_DIR)
 
 
 logger = logger_utils.get_logger(__name__)
-logger.info(
-    f"Added the following directory to PYTHONPATH to simulate multiple modules: {ROOT_DIR}"
-)
+logger.info(f"Added the following directory to PYTHONPATH to simulate multiple modules: {ROOT_DIR}")

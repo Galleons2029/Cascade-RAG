@@ -28,5 +28,5 @@ if __name__ == "__main__":
         "mongodb://localhost:30001,localhost:30002,localhost:30003/?replicaSet=my-replica-set",
         "twin",
         "posts",
-        {"platform": "linkedin", "content": "Test content"}
+        {"platform": "linkedin", "content": "Test content"},
     )

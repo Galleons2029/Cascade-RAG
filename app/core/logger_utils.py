@@ -27,8 +27,25 @@ from app.configs import (
     agent_config as settings,
 )
 
+
 def get_logger(cls: str):
     return structlog.get_logger().bind(cls=cls)
+
+
+# Helpers are defined up-front so logging still works during interpreter shutdown.
+def _safe_environment_value() -> str:
+    """Return the environment label even if settings is partially torn down."""
+    default = Environment.DEVELOPMENT.value
+    try:
+        env = getattr(settings, "ENVIRONMENT", None)
+    except Exception:  # pragma: no cover - defensive during shutdown
+        return default
+
+    if isinstance(env, Environment):
+        return env.value
+    if env is None:
+        return default
+    return getattr(env, "value", str(env))
 
 
 # Ensure log directory exists
@@ -41,7 +58,7 @@ def get_log_file_path() -> Path:
     Returns:
         Path: The path to the log file
     """
-    env_prefix = settings.ENVIRONMENT.value
+    env_prefix = _safe_environment_value()
     return settings.LOG_DIR / f"{env_prefix}-{datetime.now().strftime('%Y-%m-%d')}.jsonl"
 
 
@@ -56,6 +73,7 @@ class JsonlFileHandler(logging.Handler):
         """
         super().__init__()
         self.file_path = file_path
+        self.environment = _safe_environment_value()
 
     def emit(self, record: logging.LogRecord) -> None:
         """Emit a record to the JSONL file."""
@@ -68,7 +86,7 @@ class JsonlFileHandler(logging.Handler):
                 "function": record.funcName,
                 "filename": record.pathname,
                 "line": record.lineno,
-                "environment": settings.ENVIRONMENT.value,
+                "environment": self.environment,
             }
             if hasattr(record, "extra"):
                 log_entry.update(record.extra)
@@ -119,7 +137,8 @@ def get_structlog_processors(include_file_info: bool = True) -> List[Any]:
         )
 
     # Add environment info
-    processors.append(lambda _, __, event_dict: {**event_dict, "environment": settings.ENVIRONMENT.value})
+    env_value = _safe_environment_value()
+    processors.append(lambda _, __, event_dict, env=env_value: {**event_dict, "environment": env})
 
     return processors
 
@@ -176,16 +195,37 @@ def setup_logging() -> None:
             cache_logger_on_first_use=True,
         )
 
-#
-# # Initialize logging
-# setup_logging()
-#
-# # Create logger instance
-# logger = structlog.get_logger()
-# logger.info(
-#     "logging_initialized",
-#     environment=settings.ENVIRONMENT.value,
-#     log_level=settings.LOG_LEVEL,
-#     log_format=settings.LOG_FORMAT,
-# )
+    # Quiet noisy third-party loggers such as pika, regardless of global level
+    pika_debug_enabled = getattr(settings, "ENABLE_PIKA_DEBUG", False)
+    noisy_loggers = (
+        "pika",
+        "pika.connection",
+        "pika.channel",
+        "pika.adapters",
+        "pika.adapters.utils",
+        "pika.adapters.utils.io_services_utils",
+        "pika.adapters.utils.connection_workflow",
+        "pika.adapters.blocking_connection",
+    )
+    target_level = logging.DEBUG if pika_debug_enabled else logging.CRITICAL
+    disable_noisy_pika = not pika_debug_enabled
+    for logger_name in noisy_loggers:
+        logger_obj = logging.getLogger(logger_name)
+        # Reset handlers so earlier basicConfig calls can't reattach stdout emitters.
+        logger_obj.handlers.clear()
+        logger_obj.setLevel(target_level)
+        # Only bubble up to global handlers when explicitly debugging pika internals.
+        logger_obj.propagate = pika_debug_enabled
+        # Hard-disable when not debugging to silence verbose socket traces.
+        logger_obj.disabled = disable_noisy_pika
 
+
+# Initialize logging at import-time and export a shared logger
+setup_logging()
+logger = structlog.get_logger()
+logger.info(
+    "logging_initialized",
+    environment=settings.ENVIRONMENT.value,
+    log_level=settings.LOG_LEVEL,
+    log_format=settings.LOG_FORMAT,
+)

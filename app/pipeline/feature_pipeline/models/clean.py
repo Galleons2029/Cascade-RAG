@@ -61,7 +61,7 @@ class RepositoryCleanedModel(VectorDBDataModel):
         }
 
         return self.entry_id, data
-    
+
 
 class DocumentCleanedModel(VectorDBDataModel):
     entry_id: str
@@ -72,6 +72,7 @@ class DocumentCleanedModel(VectorDBDataModel):
     cleaned_content: str
     user_id: str | None = None
     image: Optional[str] = None
+    images: Optional[list[dict]] = None
     type: str
 
     def to_payload(self) -> Tuple[str, dict]:
@@ -83,6 +84,7 @@ class DocumentCleanedModel(VectorDBDataModel):
             "user_id": self.user_id,
             "cleaned_content": self.cleaned_content,
             "image": self.image,
+            "images": self.images,
             "type": self.type,
         }
 

@@ -13,7 +13,7 @@ from fastapi import APIRouter
 from app.pipeline.inference_pipeline.reasoning import ReasoningPipeline
 
 load_dotenv()
-api_key = os.getenv('API_KEY')
+api_key = os.getenv("API_KEY")
 
 router = APIRouter()
 
@@ -34,10 +34,6 @@ def predict(message: str, history: list[list[str]], author: str) -> str:
     """
 
     query = f"我是{author}。请写关于：{message}"
-    response = llm.generate(
-        query=query, enable_rag=True, sample_for_evaluation=False
-    )
+    response = llm.generate(query=query, enable_rag=True, sample_for_evaluation=False)
 
     return response["answer"]
-
-

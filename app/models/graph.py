@@ -22,9 +22,7 @@ from pydantic import (
 class GraphState(BaseModel):
     """State definition for the LangGraph Agent/Workflow."""
 
-    messages: Annotated[list, add_messages] = Field(
-        default_factory=list, description="The messages in the conversation"
-    )
+    messages: Annotated[list, add_messages] = Field(default_factory=list, description="The messages in the conversation")
     session_id: str = Field(..., description="The unique identifier for the conversation session")
 
     @field_validator("session_id")

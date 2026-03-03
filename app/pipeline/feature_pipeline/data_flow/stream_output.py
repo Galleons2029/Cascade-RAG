@@ -1,4 +1,3 @@
-
 from bytewax.outputs import DynamicSink, StatelessSinkPartition
 from app.core import get_logger
 from app.core.db.qdrant import QdrantDatabaseConnector
@@ -35,17 +34,12 @@ class QdrantOutput(DynamicSink):
                 )
 
                 if is_vector:
-                    self._connection.create_vector_collection(
-                        collection_name=collection_name
-                    )
+                    self._connection.create_vector_collection(collection_name=collection_name)
                 else:
-                    self._connection.create_non_vector_collection(
-                        collection_name=collection_name
-                    )
+                    self._connection.create_non_vector_collection(collection_name=collection_name)
 
-    #def build(self, step_id: str, worker_index: int, worker_count: int, *args, **kwargs) -> StatelessSinkPartition:
+    # def build(self, step_id: str, worker_index: int, worker_count: int, *args, **kwargs) -> StatelessSinkPartition:
     def build(self, step_id: str, worker_index: int, *args, **kwargs) -> StatelessSinkPartition:
-
         if self._sink_type == "clean":
             return QdrantCleanedDataSink(connection=self._connection)
         elif self._sink_type == "vector":
@@ -123,7 +117,7 @@ class QdrantVectorDataSink(StatelessSinkPartition):
         payloads = [item.to_payload() for item in items]
         ids, vectors, meta_data = zip(*payloads)
         if meta_data[0]["type"] == "documents":
-            collection_name = f"zsk_{str(meta_data[0]['knowledge_id'])}"
+            collection_name = str(meta_data[0]['knowledge_id'])
             try:
                 self._client.get_collection(collection_name=collection_name)
             except UnexpectedResponse:
@@ -131,9 +125,7 @@ class QdrantVectorDataSink(StatelessSinkPartition):
                     "未检测到知识库。正在创建一个新的知识库...",
                     collection_name=collection_name,
                 )
-                self._client.create_vector_collection(
-                    collection_name=collection_name
-                )
+                self._client.create_vector_collection(collection_name=collection_name)
             logger.debug(
                 "数据类型：",
                 datamodels=meta_data,
@@ -150,7 +142,6 @@ class QdrantVectorDataSink(StatelessSinkPartition):
             collection_name=collection_name,
             num=len(ids),
         )
-
 
 
 def get_clean_collection(data_type: str) -> str:

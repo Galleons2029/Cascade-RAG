@@ -32,9 +32,7 @@ def stream_process():
 
             # Use json_util to serialize the document
             data = json.dumps(change["fullDocument"], default=json_util.default)
-            logger.info(
-                f"Change detected and serialized for a data sample of type {data_type}."
-            )
+            logger.info(f"Change detected and serialized for a data sample of type {data_type}.")
 
             # Send data to rabbitmq
             publish_to_rabbitmq(queue_name=settings.RABBITMQ_QUEUE_NAME, data=data)

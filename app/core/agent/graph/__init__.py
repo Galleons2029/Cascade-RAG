@@ -7,9 +7,10 @@
 This file include all Graph structure
 """
 
-
 from .chief_agent import (
     LangGraphAgent,
 )
 
-__all__ = ["LangGraphAgent", ]
+__all__ = [
+    "LangGraphAgent",
+]
